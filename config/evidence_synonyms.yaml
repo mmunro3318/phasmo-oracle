@@ -1,0 +1,39 @@
+# Evidence Synonyms — maps LLM-generated strings to canonical EvidenceIDs
+# Add new entries here when phi4-mini generates unexpected evidence_id values.
+# Format: "synonym": "canonical_id"
+#
+# Canonical IDs: emf_5, dots, uv, freezing, orb, writing, spirit_box
+
+# EMF Level 5
+emf: emf_5
+emf5: emf_5
+emf_level_5: emf_5
+emf_level5: emf_5
+
+# D.O.T.S. Projector
+dots_projector: dots
+d.o.t.s.: dots
+d.o.t.s: dots
+
+# Ultraviolet / Fingerprints
+fingerprints: uv
+fingerprint: uv
+ultraviolet: uv
+footprints: uv
+prints: uv
+
+# Freezing Temperatures
+freezing_temperatures: freezing
+freezing_temps: freezing
+freezing_temp: freezing
+
+# Ghost Orb
+ghost_orb: orb
+ghost_orbs: orb
+orbs: orb
+
+# Ghost Writing
+ghost_writing: writing
+
+# Spirit Box
+spiritbox: spirit_box

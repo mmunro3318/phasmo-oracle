@@ -4,6 +4,8 @@ This file is addressed to you, the AI. It tells you what Oracle is, what invaria
 
 Read this before touching any code. Read `Oracle Architecture Design.md` next. Then read the relevant sprint plan before making changes.
 
+**Note: I'm developing this project in parallel with other AI coding tools/platforms on separate branches. The best product will be the one that's deployed to the public repo.**
+
 ---
 
 ## What Oracle Is (and Isn't)
@@ -15,6 +17,7 @@ The central rule:
 > **Ghost deduction is pure Python. The LLM is never asked to reason about ghost identity.**
 
 The LLM's only jobs are:
+
 1. Parse the player's intent and route it to the correct tool
 2. Generate natural-language sentences around facts that the deduction engine already computed
 
@@ -101,6 +104,7 @@ Key point: `bind_state()` and `sync_state_from()` are the bridge between the Lan
 `graph/deduction.py:narrow_candidates()` is the most important function in the codebase. Understand it before modifying tools or adding new evidence types.
 
 Rules it enforces:
+
 - A ghost is eliminated if it lacks any confirmed evidence, unless difficulty is Nightmare (permissive: a ghost may hide one non-guaranteed evidence)
 - A ghost is eliminated if it has any ruled-out evidence, **except** The Mimic, whose `fake_evidence: orb` is not a real evidence type
 - A ghost in `eliminated_ghosts` is always removed regardless of evidence
@@ -113,13 +117,14 @@ The Mimic exception is tested in `tests/test_deduction.py:test_mimic_survives_or
 
 `route_after_tools` in `graph/nodes.py` controls when Oracle speaks unprompted. The thresholds:
 
-| Condition | Route | Node |
-|---|---|---|
-| `len(candidates) == 1` AND `len(confirmed) >= threshold` | `"identify"` | `identify_node` |
-| candidates changed this turn AND `1 < len(candidates) <= 5` | `"commentary"` | `commentary_node` |
-| anything else | `"llm"` | loops back to `llm_node` |
+| Condition                                                   | Route          | Node                     |
+| ----------------------------------------------------------- | -------------- | ------------------------ |
+| `len(candidates) == 1` AND `len(confirmed) >= threshold`    | `"identify"`   | `identify_node`          |
+| candidates changed this turn AND `1 < len(candidates) <= 5` | `"commentary"` | `commentary_node`        |
+| anything else                                               | `"llm"`        | loops back to `llm_node` |
 
 Evidence thresholds by difficulty (in `_EVIDENCE_THRESHOLD`):
+
 - Amateur / Intermediate / Professional: **3**
 - Nightmare: **2**
 - Insanity: **1**
@@ -130,16 +135,16 @@ Evidence thresholds by difficulty (in `_EVIDENCE_THRESHOLD`):
 
 ## Tool Reference
 
-| Tool | Writes to DB? | Mutates candidates? | Notes |
-|---|---|---|---|
-| `init_investigation` | Yes — `sessions` row | Yes — resets to 27 | Also resets `session_start_time` |
-| `record_evidence` | Yes — `evidence_events` | Yes — via `narrow_candidates()` | Handles Mimic exception |
-| `record_behavioral_event` | No | Yes — if `eliminator_key` matches | Key must match `observation_eliminators` in YAML |
-| `get_investigation_state` | No | No | Read-only summary |
-| `query_ghost_database` | No | No | Loads from YAML, case-insensitive name match |
-| `record_ghost_event` | Yes — `ghost_events` | No | Normalises event_type to known set |
-| `record_death` | Yes — `deaths`, increments `death_count` | No | Defaults player to `state["speaker"]` |
-| `confirm_true_ghost` | Yes — closes `sessions` row | No | Computes `oracle_correct` |
+| Tool                      | Writes to DB?                            | Mutates candidates?               | Notes                                            |
+| ------------------------- | ---------------------------------------- | --------------------------------- | ------------------------------------------------ |
+| `init_investigation`      | Yes — `sessions` row                     | Yes — resets to 27                | Also resets `session_start_time`                 |
+| `record_evidence`         | Yes — `evidence_events`                  | Yes — via `narrow_candidates()`   | Handles Mimic exception                          |
+| `record_behavioral_event` | No                                       | Yes — if `eliminator_key` matches | Key must match `observation_eliminators` in YAML |
+| `get_investigation_state` | No                                       | No                                | Read-only summary                                |
+| `query_ghost_database`    | No                                       | No                                | Loads from YAML, case-insensitive name match     |
+| `record_ghost_event`      | Yes — `ghost_events`                     | No                                | Normalises event_type to known set               |
+| `record_death`            | Yes — `deaths`, increments `death_count` | No                                | Defaults player to `state["speaker"]`            |
+| `confirm_true_ghost`      | Yes — closes `sessions` row              | No                                | Computes `oracle_correct`                        |
 
 ---
 
@@ -192,6 +197,7 @@ WakeWordDetector → VoiceSession._mic_loop / LoopbackCapture._capture_loop
 ```
 
 Never shortcut this chain. In particular:
+
 - `TextToSpeech` owns the `is_speaking` flag. Nothing else should set it.
 - `AudioRouter` owns all `sd.play()` calls. Don't add playback elsewhere.
 - `VoiceSession` owns the turn queue. `main.py` reads from it; voice modules write to it.
@@ -214,6 +220,7 @@ pytest tests/test_llm.py tests/test_audio_router.py tests/test_loopback.py -v
 ```
 
 Tests that must always pass before any commit:
+
 - `test_deduction.py::test_mimic_survives_orb_ruled_out`
 - `test_deduction.py::test_all_ghosts_loaded` (expects exactly 27)
 - `test_triggers.py::test_identify_does_not_fire_with_insufficient_evidence`
@@ -278,15 +285,15 @@ Edit `ghost_database.yaml` only. The deduction engine, tools, and stats layer al
 
 Build and validate sprints in order. Each sprint's `Definition of Done` is the gate for the next.
 
-| Sprint | First file to build | Key test to pass first |
-|---|---|---|
-| 1 | `graph/deduction.py` | `test_deduction.py` (no LLM needed) |
-| 2 | `graph/nodes.py` (add trigger functions) | `test_triggers.py` |
-| 3 | `voice/audio_router.py` | `test_audio_router.py` |
-| 4 | `voice/loopback_capture.py` | `test_loopback.py` |
-| 5 | `graph/llm.py` | `test_llm.py` |
-| 6 | `db/database.py` | `test_db.py` (schema + CRUD before queries) |
-| 7 | `ghost_database.yaml` (Tier 1 profiles) | `test_behavioral_reasoning.py` (classification + profile retrieval before LLM mocks) |
+| Sprint | First file to build                      | Key test to pass first                                                               |
+| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1      | `graph/deduction.py`                     | `test_deduction.py` (no LLM needed)                                                  |
+| 2      | `graph/nodes.py` (add trigger functions) | `test_triggers.py`                                                                   |
+| 3      | `voice/audio_router.py`                  | `test_audio_router.py`                                                               |
+| 4      | `voice/loopback_capture.py`              | `test_loopback.py`                                                                   |
+| 5      | `graph/llm.py`                           | `test_llm.py`                                                                        |
+| 6      | `db/database.py`                         | `test_db.py` (schema + CRUD before queries)                                          |
+| 7      | `ghost_database.yaml` (Tier 1 profiles)  | `test_behavioral_reasoning.py` (classification + profile retrieval before LLM mocks) |
 
 Sprint 1's `python main.py --text` smoke test is the most important regression gate. Run it before and after every change to the graph or tools. If it breaks, fix it before proceeding.
 
@@ -322,12 +329,12 @@ ollama pull phi4-mini
 
 ## Document Index
 
-| Document | Read when... |
-|---|---|
-| `README.md` | Starting fresh — overview, install, usage |
-| `Oracle Architecture Design.md` | Before touching `graph/` — full rationale for tool-calling agent design |
-| `Roadmap.md` | Planning which sprint to work on |
-| `Sprint N — Detailed Plan.md` | Before implementing that sprint — scaffold code, task board, known risks |
+| Document                                            | Read when...                                                                            |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `README.md`                                         | Starting fresh — overview, install, usage                                               |
+| `Oracle Architecture Design.md`                     | Before touching `graph/` — full rationale for tool-calling agent design                 |
+| `Roadmap.md`                                        | Planning which sprint to work on                                                        |
+| `Sprint N — Detailed Plan.md`                       | Before implementing that sprint — scaffold code, task board, known risks                |
 | `ghost_database.yaml` (behavioral_profile sections) | When populating Sprint 7 ghost data — use the speed reference table in the Sprint 7 doc |
-| `config/ghost_database.yaml` | Adding or correcting ghost data |
-| This file | Before any code changes — rules, invariants, gotchas |
+| `config/ghost_database.yaml`                        | Adding or correcting ghost data                                                         |
+| This file                                           | Before any code changes — rules, invariants, gotchas                                    |
