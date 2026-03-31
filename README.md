@@ -63,6 +63,39 @@ You: "rule out spirit box"
 
 ## Installation
 
+### Option A — conda (recommended if you already use Anaconda or Miniconda)
+
+```bash
+# 1. Clone and enter the project
+git clone <repo-url>
+cd oracle
+
+# 2. Create and activate the conda environment from the provided file
+conda env create -f environment.yml
+conda activate oracle
+
+# 3. Pull the local model
+ollama pull phi4-mini
+
+# 4. Copy and configure environment
+cp config/.env.local.example config/.env.local
+# Edit config/.env.local — see Configuration below
+
+# 5. Run startup diagnostics
+python main.py --check
+
+# 6. Start Oracle
+python main.py
+```
+
+> **Tip — reactivating later:** every time you open a new terminal, run `conda activate oracle` before `python main.py`. To deactivate the environment, run `conda deactivate`.
+
+> **Updating packages:** if dependencies change, run `conda env update -f environment.yml --prune` inside the activated environment.
+
+---
+
+### Option B — standard venv
+
 ```bash
 # 1. Clone and enter the project
 git clone <repo-url>
