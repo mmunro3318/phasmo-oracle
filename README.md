@@ -65,8 +65,11 @@ You: "rule out spirit box"
 
 ```bash
 # 1. Clone and enter the project
-git clone <repo-url>
-cd oracle
+git clone https://github.com/mmunro3318/phasmo-oracle   # main branch
+cd phasmo-oracle
+# switch to main dev branch
+git fetch origin
+git checkout claude-code-dev
 
 # 2. Create a virtual environment
 python -m venv .venv
