@@ -49,7 +49,8 @@ You: "rule out spirit box"
 
 ### Runtime
 - Python 3.11+
-- [Ollama](https://ollama.com) with `phi4-mini` pulled (`ollama pull phi4-mini`)
+- <strike>[Ollama](https://ollama.com) with `phi4-mini` pulled (`ollama pull phi4-mini`)</strike>
+- [Ollama](https://ollama.com) with `qwen2.5:7b` pulled (`ollama pull qwen2.5:7b`) (switched to Qwen for better tool calls)
 - [Kokoro ONNX](https://github.com/thewh1teagle/kokoro-onnx) model files: `kokoro-v0_19.onnx` + `voices-v1_0.bin` (place in project root)
 
 ### Optional (for Steam routing and bidirectional mode)
