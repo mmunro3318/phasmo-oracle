@@ -86,12 +86,19 @@ If you've never set up a Python project before, follow this section first. If yo
 ### Quick start (for experienced developers)
 
 ```bash
-git clone <repo-url>
+# In Powershell
+git clone https://github.com/mmunro3318/phasmo-oracle.git
 cd phasmo-oracle
+
+# Dev/experimentation is generally on `claude-code-dev` branch
+# Checkout this branch for most current version, `main` is most stable version
+git fetch origin
+git checkout claude-code-dev
+
 python -m venv .venv
 .venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
 pip install -e ".[dev]"
-ollama pull qwen2.5:7b
+ollama pull qwen2.5:7b          # you may have to run the model in separate terminal: ollama run qwen2.5:7b
 python main.py --check
 python main.py
 ```
@@ -101,9 +108,14 @@ python main.py
 **1. Clone the project**
 
 Open a terminal (Command Prompt, PowerShell, or VS Code terminal) and run:
+
 ```
-git clone <repo-url>
+git clone https://github.com/mmunro3318/phasmo-oracle.git
 cd phasmo-oracle
+
+# If you want my more recent/experimental build, switch to branch:
+git fetch origin
+git checkout claude-code-dev
 ```
 
 **2. Open in VS Code**
@@ -117,6 +129,7 @@ This opens VS Code in the project folder. If `code .` doesn't work, open VS Code
 **3. Create a virtual environment**
 
 Open the VS Code terminal (Ctrl+\` or Terminal → New Terminal) and run:
+
 ```
 python -m venv .venv
 ```
@@ -132,9 +145,11 @@ This creates an isolated Python environment in a `.venv` folder so Oracle's pack
 You should see `(.venv)` appear at the start of your terminal prompt. This means the virtual environment is active. **You need to do this every time you open a new terminal.**
 
 If you get an error about "execution of scripts is disabled", run this first:
+
 ```
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
+
 Then try activating again.
 
 **5. Tell VS Code to use this environment**
@@ -144,6 +159,7 @@ Press Ctrl+Shift+P, type "Python: Select Interpreter", and choose the one that s
 **6. Install dependencies**
 
 With the virtual environment active (you should see `(.venv)` in the prompt):
+
 ```
 pip install -e ".[dev]"
 ```
@@ -168,15 +184,15 @@ Type evidence like "ghost orb confirmed" or "rule out spirit box" and Oracle wil
 
 ### Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| `python: command not found` | Python wasn't added to PATH. Reinstall Python and check "Add to PATH". |
-| `pip: command not found` | Same as above — pip comes with Python. |
-| `ModuleNotFoundError` | Virtual environment isn't active. Run `.venv\Scripts\activate` first. |
-| `Ollama connection: Not reachable` | Ollama isn't running. Start it from the Start menu or system tray. |
-| `Model not pulled` | Run `ollama pull qwen2.5:7b` and wait for it to download. |
-| `execution of scripts is disabled` | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` |
-| Conda conflicts | Don't use conda. Use `python -m venv .venv` instead. Oracle is designed for venv. |
+| Problem                            | Fix                                                                               |
+| ---------------------------------- | --------------------------------------------------------------------------------- |
+| `python: command not found`        | Python wasn't added to PATH. Reinstall Python and check "Add to PATH".            |
+| `pip: command not found`           | Same as above — pip comes with Python.                                            |
+| `ModuleNotFoundError`              | Virtual environment isn't active. Run `.venv\Scripts\activate` first.             |
+| `Ollama connection: Not reachable` | Ollama isn't running. Start it from the Start menu or system tray.                |
+| `Model not pulled`                 | Run `ollama pull qwen2.5:7b` and wait for it to download.                         |
+| `execution of scripts is disabled` | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`        |
+| Conda conflicts                    | Don't use conda. Use `python -m venv .venv` instead. Oracle is designed for venv. |
 
 ---
 
@@ -266,28 +282,28 @@ pytest tests/ -m llm -v
 
 ### Key test files
 
-| File | Tests | Ollama? |
-|------|-------|---------|
-| `test_deduction.py` | 27-ghost parametrized deduction, Mimic edge case, Nightmare/Insanity | No |
-| `test_intent_router.py` | 74 natural language → intent classification tests | No |
-| `test_tools.py` | All 5 tools, synonyms, over-proofed detection | No |
-| `test_nodes.py` | Graph node functions, routing logic | No |
-| `test_llm.py` | LLM factory with mocked Ollama | No |
-| `test_intent_parsing.py` | LLM intent parsing regression tests | Yes |
+| File                     | Tests                                                                | Ollama? |
+| ------------------------ | -------------------------------------------------------------------- | ------- |
+| `test_deduction.py`      | 27-ghost parametrized deduction, Mimic edge case, Nightmare/Insanity | No      |
+| `test_intent_router.py`  | 74 natural language → intent classification tests                    | No      |
+| `test_tools.py`          | All 5 tools, synonyms, over-proofed detection                        | No      |
+| `test_nodes.py`          | Graph node functions, routing logic                                  | No      |
+| `test_llm.py`            | LLM factory with mocked Ollama                                       | No      |
+| `test_intent_parsing.py` | LLM intent parsing regression tests                                  | Yes     |
 
 ---
 
 ## Sprint Roadmap
 
-| Sprint | Focus | Status |
-|--------|-------|--------|
-| 1 | Core agent loop — text mode, deduction engine, 5 tools, two-stage chain | **In Progress** |
-| 2 | Full conditional graph + voice shell (Whisper / Kokoro) | Planned |
-| 3 | Steam routing via Voicemeeter + dual-output TTS | Planned |
-| 4 | Bidirectional — second player queries Oracle via loopback | Planned |
-| 5 | API fallback, terminal UI polish, session replay, diagnostics | Planned |
-| 6 | Session persistence, game metrics, `--stats` flag | Planned |
-| 7 | Behavioral reasoning — speed, visibility, hunting profiles | Planned |
+| Sprint | Focus                                                                   | Status          |
+| ------ | ----------------------------------------------------------------------- | --------------- |
+| 1      | Core agent loop — text mode, deduction engine, 5 tools, two-stage chain | **In Progress** |
+| 2      | Full conditional graph + voice shell (Whisper / Kokoro)                 | Planned         |
+| 3      | Steam routing via Voicemeeter + dual-output TTS                         | Planned         |
+| 4      | Bidirectional — second player queries Oracle via loopback               | Planned         |
+| 5      | API fallback, terminal UI polish, session replay, diagnostics           | Planned         |
+| 6      | Session persistence, game metrics, `--stats` flag                       | Planned         |
+| 7      | Behavioral reasoning — speed, visibility, hunting profiles              | Planned         |
 
 ---
 

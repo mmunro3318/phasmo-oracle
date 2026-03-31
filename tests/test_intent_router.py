@@ -179,6 +179,37 @@ class TestBehavioralEvents:
         assert intent.eliminator_key == "airball_event_observed"
 
 
+# ── Advice / suggest next evidence ───────────────────────────────────────────
+
+class TestAdviceQueries:
+    @pytest.mark.parametrize("text", [
+        "what should we do next?",
+        "what should we test?",
+        "what evidence should we look for?",
+        "what should I check next?",
+        "suggest something",
+        "what's next?",
+        "what else can we try?",
+    ])
+    def test_advice_queries(self, text):
+        intent = parse_intent(text)
+        assert intent.action == "suggest_next_evidence", f"Expected suggest_next_evidence for: {text}"
+
+
+# ── Ghost evidence queries ──────────────────────────────────────────────────
+
+class TestGhostEvidenceQueries:
+    def test_what_evidence_does_ghost_have(self):
+        intent = parse_intent("what evidence does the Banshee have?")
+        assert intent.action == "query_ghost_database"
+        assert intent.ghost_name == "Banshee"
+
+    def test_what_evidence_does_ghost_need(self):
+        intent = parse_intent("what evidence does the Spirit need?")
+        assert intent.action == "query_ghost_database"
+        assert intent.ghost_name == "Spirit"
+
+
 # ── LLM fallback ────────────────────────────────────────────────────────────
 
 class TestLLMFallback:
@@ -187,7 +218,6 @@ class TestLLMFallback:
         "this is creepy",
         "thanks oracle",
         "hello",
-        "what should we do next?",
     ])
     def test_ambiguous_inputs_fall_back(self, text):
         intent = parse_intent(text)

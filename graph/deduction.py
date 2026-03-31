@@ -58,6 +58,11 @@ def narrow_candidates(
         evidence_set = set(ghost.get("evidence", []))
         fake = ghost.get("fake_evidence")  # e.g. "orb" for Mimic
 
+        # The Mimic always produces its fake evidence (Ghost Orbs), so for
+        # the purpose of checking confirmed evidence, fake_evidence counts
+        # as an observable evidence type.
+        observable_set = evidence_set | ({fake} if fake else set())
+
         # guaranteed_evidence can be a string or null — normalize to a set
         ge = ghost.get("guaranteed_evidence")
         guaranteed_set = {ge} if ge else set()
@@ -66,28 +71,31 @@ def narrow_candidates(
             continue
 
         # --- Ruled-out check ---
+        # A ghost is eliminated if it has any ruled-out evidence in its
+        # real evidence set. Fake evidence is NOT real — ruling out orbs
+        # does NOT eliminate the Mimic because those orbs are fake.
         skip = False
         for e in ruled_out:
             if e in evidence_set:
-                # Mimic's fake evidence is not a real evidence type for it
-                if fake and e == fake:
-                    continue
                 skip = True
                 break
         if skip:
             continue
 
         # --- Confirmed check ---
+        # A ghost must have all confirmed evidence in its observable set
+        # (real evidence + fake evidence). This means confirming Ghost Orbs
+        # does NOT eliminate the Mimic, because orbs are in its observable set.
         if not permissive:
             # Standard mode: ghost must have ALL confirmed evidence
             for e in confirmed:
-                if e not in evidence_set:
+                if e not in observable_set:
                     skip = True
                     break
         else:
             # Nightmare/Insanity: ghost can hide non-guaranteed evidence.
             # Count how many confirmed types the ghost is missing.
-            missing = [e for e in confirmed if e not in evidence_set]
+            missing = [e for e in confirmed if e not in observable_set]
             # A ghost can hide at most 1 evidence on Nightmare, 2 on Insanity.
             # But it can NEVER hide its guaranteed evidence.
             max_hidden = 1 if difficulty == "nightmare" else 2

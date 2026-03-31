@@ -80,6 +80,20 @@ STATE_PATTERNS: list[re.Pattern] = [
     re.compile(r"\b(?:what\s+have\s+we\s+(?:collected|found|got))\b", re.IGNORECASE),
 ]
 
+ADVICE_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\b(?:what\s+should\s+(?:we|i)\s+(?:do|test|check|try|look\s+for))\b", re.IGNORECASE),
+    re.compile(r"\b(?:what(?:'s|'s|\s+is)\s+next|next\s+step)\b", re.IGNORECASE),
+    re.compile(r"\b(?:what\s+evidence\s+should)\b", re.IGNORECASE),
+    re.compile(r"\b(?:suggest|recommend|advice|help\s+me)\b", re.IGNORECASE),
+    re.compile(r"\b(?:what\s+(?:else\s+)?(?:can|should)\s+we\s+(?:test|check|try))\b", re.IGNORECASE),
+]
+
+GHOST_EVIDENCE_QUERY_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\bwhat\s+evidence\s+does\s+(?:the\s+)?(\w+)\s+(?:have|need|require|use)\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+(?:are|is)\s+(?:the\s+)?(\w+)(?:'s|'s)?\s+evidence\b", re.IGNORECASE),
+    re.compile(r"\b(\w+)\s+evidence\s+(?:types?|list)\b", re.IGNORECASE),
+]
+
 DIFFICULTY_PATTERN = re.compile(
     r"\b(amateur|intermediate|professional|nightmare|insanity)\b", re.IGNORECASE
 )
@@ -123,6 +137,7 @@ class ParsedIntent:
     status: str | None = None
     difficulty: str | None = None
     ghost_name: str | None = None
+    query_field: str | None = None  # For query_ghost_database: specific field to look up
     observation: str | None = None
     eliminator_key: str | None = None
     confidence: float = 1.0
@@ -205,7 +220,31 @@ def parse_intent(text: str) -> ParsedIntent:
             extra_evidence=evidence_found[1:],
         )
 
-    # 3. State query?
+    # 3. Advice / "what should we do next?"
+    for pattern in ADVICE_PATTERNS:
+        if pattern.search(text):
+            return ParsedIntent(
+                action="suggest_next_evidence",
+                raw_text=text,
+            )
+
+    # 4. Ghost evidence query — "what evidence does the Banshee have?"
+    #    Must come BEFORE generic state queries because "what evidence does X have"
+    #    contains "what...evidence" which would match state query patterns.
+    for pattern in GHOST_EVIDENCE_QUERY_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            raw_name = m.group(1)
+            ghost_name = _find_ghost_name(raw_name) or _find_ghost_name(text)
+            if ghost_name:
+                return ParsedIntent(
+                    action="query_ghost_database",
+                    ghost_name=ghost_name,
+                    query_field="evidence",
+                    raw_text=text,
+                )
+
+    # 5. State query?
     for pattern in STATE_PATTERNS:
         if pattern.search(text):
             return ParsedIntent(
@@ -213,7 +252,7 @@ def parse_intent(text: str) -> ParsedIntent:
                 raw_text=text,
             )
 
-    # 4. Behavioral observation?
+    # 6. Behavioral observation?
     for key, pattern in BEHAVIORAL_PATTERNS.items():
         if pattern.search(text):
             return ParsedIntent(
@@ -223,7 +262,7 @@ def parse_intent(text: str) -> ParsedIntent:
                 raw_text=text,
             )
 
-    # 5. Ghost database query?
+    # 7. Ghost database query (generic)?
     ghost_name = _find_ghost_name(text)
     if ghost_name:
         return ParsedIntent(

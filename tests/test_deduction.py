@@ -200,6 +200,53 @@ def test_mimic_survives_orb_ruled_out():
     )
 
 
+def test_mimic_survives_orb_confirmed():
+    """CRITICAL: Confirming Ghost Orbs must NOT eliminate The Mimic.
+    The Mimic always produces ghost orbs via fake_evidence — orbs are
+    observable evidence for the Mimic even though they're not 'real'."""
+    candidates = narrow_candidates(
+        confirmed=["orb"],
+        ruled_out=[],
+        eliminated=[],
+        difficulty="professional",
+    )
+    assert "The Mimic" in candidates
+
+
+def test_mimic_survives_orb_plus_real_evidence():
+    """Confirming orb + one of Mimic's real evidence should keep Mimic."""
+    # Mimic's real evidence: uv, freezing, spirit_box
+    candidates = narrow_candidates(
+        confirmed=["orb", "uv"],
+        ruled_out=[],
+        eliminated=[],
+        difficulty="professional",
+    )
+    assert "The Mimic" in candidates
+
+
+def test_mimic_survives_on_nightmare_with_orb():
+    """On Nightmare, Mimic with confirmed orb should survive."""
+    candidates = narrow_candidates(
+        confirmed=["orb", "freezing"],
+        ruled_out=[],
+        eliminated=[],
+        difficulty="nightmare",
+    )
+    assert "The Mimic" in candidates
+
+
+def test_mimic_survives_on_insanity_with_orb():
+    """On Insanity, Mimic with confirmed orb should survive."""
+    candidates = narrow_candidates(
+        confirmed=["orb"],
+        ruled_out=[],
+        eliminated=[],
+        difficulty="insanity",
+    )
+    assert "The Mimic" in candidates
+
+
 def test_mimic_eliminated_by_real_evidence():
     """Ruling out one of The Mimic's real evidence types SHOULD eliminate it."""
     # The Mimic's real evidence: [uv, freezing, spirit_box]

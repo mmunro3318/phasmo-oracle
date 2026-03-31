@@ -149,26 +149,49 @@ def record_evidence(evidence_id: str, status: str) -> str:
             f"Updated to {status.replace('_', ' ')}."
         )
 
-    # Over-proofed detection
-    if len(confirmed) > 3:
-        if len(confirmed) == 4 and "orb" in confirmed:
+    # Difficulty-aware evidence threshold
+    difficulty = _state.get("difficulty", "professional")
+    threshold = _EVIDENCE_THRESHOLDS.get(difficulty, 3)
+
+    # Over-proofed / threshold detection
+    if status == "confirmed" and len(confirmed) > threshold:
+        if "orb" in confirmed:
+            # Exceeding threshold with orbs = Mimic lock-in
             parts.append(
-                "4 evidence types confirmed (including Ghost Orb). "
-                "This is very likely The Mimic, or you may have recorded something incorrectly."
+                f"{len(confirmed)} evidence types confirmed on {difficulty} difficulty "
+                f"(max expected: {threshold}), including Ghost Orb. "
+                "This is The Mimic — only The Mimic produces extra evidence via Ghost Orbs."
             )
         else:
             parts.append(
-                f"{len(confirmed)} evidence types confirmed. "
-                "Ghosts can only have 3 evidence types. "
+                f"{len(confirmed)} evidence types confirmed but {difficulty} difficulty "
+                f"only allows {threshold}. "
                 "You may have recorded something incorrectly — consider rechecking."
             )
+    elif status == "confirmed" and len(confirmed) == threshold:
+        # Threshold reached
+        parts.append(
+            f"That's {len(confirmed)} evidence confirmed — the maximum observable "
+            f"on {difficulty} difficulty."
+        )
 
     parts.append(f"{n} candidate(s) remain after recording {evidence_id} as {status}: {names}")
 
-    if n == 0:
+    # Identification announcement
+    if n == 1:
+        parts.append(f"The ghost is {_state['candidates'][0]}.")
+    elif n == 0:
         parts.append(
             "No ghosts match this evidence combination. "
             "Something may be recorded incorrectly."
+        )
+
+    # Mimic awareness: when orbs are confirmed and Mimic is still a candidate
+    if (status == "confirmed" and evidence_id == "orb"
+            and "The Mimic" in _state["candidates"] and n > 1):
+        parts.append(
+            "Note: Ghost Orbs are present — The Mimic is always a possibility "
+            "since it generates Ghost Orbs as fake evidence."
         )
 
     return " ".join(parts)
@@ -252,18 +275,130 @@ def query_ghost_database(ghost_name: str, field: str = "") -> str:
             return f"Field '{field}' not found for {ghost['name']}."
         return f"{ghost['name']} — {field}: {val}"
 
-    # Full summary
+    # Full summary with evidence status relative to current investigation
     ge = ghost.get("guaranteed_evidence")
+    ghost_evidence = ghost.get("evidence", [])
+    confirmed = set(_state.get("evidence_confirmed", []))
+    ruled_out = set(_state.get("evidence_ruled_out", []))
+
+    # Show each evidence type with its status
+    evidence_status_parts = []
+    for e in ghost_evidence:
+        label = _EVIDENCE_LABELS.get(e, e)
+        if e in confirmed:
+            evidence_status_parts.append(f"{label} (CONFIRMED)")
+        elif e in ruled_out:
+            evidence_status_parts.append(f"{label} (RULED OUT)")
+        else:
+            evidence_status_parts.append(f"{label} (untested)")
+
+    # Check if ghost has fake evidence (Mimic)
+    fake = ghost.get("fake_evidence")
+    if fake:
+        fake_label = _EVIDENCE_LABELS.get(fake, fake)
+        evidence_status_parts.append(f"{fake_label} (fake — always present)")
+
     lines = [
         f"Ghost: {ghost['name']}",
-        f"Evidence: {', '.join(ghost.get('evidence', []))}",
+        f"Evidence: {', '.join(evidence_status_parts)}",
         f"Guaranteed evidence (Nightmare): {ge or 'none'}",
         f"Hunt threshold: {ghost.get('hunt_threshold', {})}",
-        f"Hard flags: {ghost.get('hard_flags', {})}",
         f"Behavioral tells: {'; '.join(ghost.get('behavioral_tells', [])) or 'none'}",
-        f"Community tests: {'; '.join(t.get('name', '') for t in ghost.get('community_tests', [])) or 'none'}",
     ]
+
+    # Show which evidence still needs testing for this ghost
+    remaining = [e for e in ghost_evidence if e not in confirmed and e not in ruled_out]
+    if remaining:
+        remaining_labels = [_EVIDENCE_LABELS.get(e, e) for e in remaining]
+        lines.append(f"Still need to test: {', '.join(remaining_labels)}")
+
     return "\n".join(lines)
+
+
+# ── Evidence threshold by difficulty ──────────────────────────────────────────
+
+_EVIDENCE_THRESHOLDS = {
+    "amateur": 3,
+    "intermediate": 3,
+    "professional": 3,
+    "nightmare": 2,
+    "insanity": 1,
+}
+
+# ── Evidence labels for human-readable output ────────────────────────────────
+
+_EVIDENCE_LABELS = {
+    "emf_5": "EMF Level 5",
+    "dots": "D.O.T.S. Projector",
+    "uv": "Ultraviolet",
+    "freezing": "Freezing Temperatures",
+    "orb": "Ghost Orb",
+    "writing": "Ghost Writing",
+    "spirit_box": "Spirit Box",
+}
+
+
+@tool
+def suggest_next_evidence() -> str:
+    """Suggest which evidence types to test next based on current state.
+    Call this when the player asks 'what should we do next?' or
+    'what evidence should we look for?'
+    """
+    confirmed = set(_state.get("evidence_confirmed", []))
+    ruled_out = set(_state.get("evidence_ruled_out", []))
+    tested = confirmed | ruled_out
+    remaining = VALID_EVIDENCE - tested
+
+    difficulty = _state.get("difficulty", "professional")
+    threshold = _EVIDENCE_THRESHOLDS.get(difficulty, 3)
+    candidates = _state.get("candidates", [])
+    n_confirmed = len(confirmed)
+
+    parts = []
+
+    # Check if evidence threshold reached
+    if n_confirmed >= threshold:
+        parts.append(
+            f"You've confirmed {n_confirmed} evidence type(s) — that's the maximum "
+            f"observable on {difficulty} difficulty."
+        )
+        if len(candidates) == 1:
+            parts.append(f"The ghost is {candidates[0]}.")
+        elif len(candidates) <= 5:
+            parts.append(f"Remaining candidates: {', '.join(candidates)}.")
+            parts.append("Use behavioral observations or rule out evidence to narrow further.")
+        else:
+            parts.append(f"{len(candidates)} candidates remain. Rule out evidence to narrow the field.")
+        return " ".join(parts)
+
+    # Suggest remaining evidence
+    if remaining:
+        remaining_labels = [_EVIDENCE_LABELS.get(e, e) for e in sorted(remaining)]
+        parts.append(f"Evidence not yet tested: {', '.join(remaining_labels)}.")
+
+        # If candidates are narrow, suggest evidence that would help most
+        if 1 < len(candidates) <= 8:
+            # Find which untested evidence types appear most/least among candidates
+            # to suggest the most discriminating one
+            from .deduction import get_ghost
+            evidence_counts: dict[str, int] = {}
+            for e in remaining:
+                count = sum(
+                    1 for c in candidates
+                    if (ghost := get_ghost(c)) and e in ghost.get("evidence", [])
+                )
+                evidence_counts[e] = count
+
+            # Best discriminator: evidence that ~half the candidates have
+            half = len(candidates) / 2
+            best = min(evidence_counts, key=lambda e: abs(evidence_counts[e] - half))
+            best_label = _EVIDENCE_LABELS.get(best, best)
+            parts.append(f"Try {best_label} next — it will narrow the field most effectively.")
+    else:
+        parts.append("All evidence types have been tested.")
+
+    parts.append(f"{len(candidates)} candidate(s) remain.")
+    return " ".join(parts)
 
 
 ORACLE_TOOLS = [
@@ -272,4 +407,5 @@ ORACLE_TOOLS = [
     record_behavioral_event,
     get_investigation_state,
     query_ghost_database,
+    suggest_next_evidence,
 ]

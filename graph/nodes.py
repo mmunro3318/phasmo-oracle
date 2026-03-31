@@ -22,6 +22,7 @@ from .tools import (
     record_behavioral_event,
     get_investigation_state,
     query_ghost_database,
+    suggest_next_evidence,
 )
 
 logger = logging.getLogger("oracle.nodes")
@@ -145,8 +146,10 @@ def execute_tool_node(state: OracleState) -> dict:
         elif action == "query_ghost_database":
             result = query_ghost_database.invoke({
                 "ghost_name": intent.get("ghost_name", ""),
-                "field": intent.get("field", ""),
+                "field": intent.get("query_field", "") or intent.get("field", ""),
             })
+        elif action == "suggest_next_evidence":
+            result = suggest_next_evidence.invoke({})
         elif action == "record_behavioral_event":
             result = record_behavioral_event.invoke({
                 "observation": intent.get("observation", ""),
