@@ -10,18 +10,24 @@ Read this before touching any code. Read `Oracle Architecture Design.md` next. T
 
 ## What Oracle Is (and Isn't)
 
-Oracle is a **tool-calling LangGraph agent** that identifies Phasmophobia ghosts from spoken evidence. It is **not a chatbot**. The distinction matters for every design decision in the codebase.
+Oracle is a **two-stage LangGraph agent** that identifies Phasmophobia ghosts from spoken evidence. It is **not a chatbot**. The distinction matters for every design decision in the codebase.
 
 The central rule:
 
 > **Ghost deduction is pure Python. The LLM is never asked to reason about ghost identity.**
 
-The LLM's only jobs are:
+Oracle uses a **two-stage chain** architecture:
 
-1. Parse the player's intent and route it to the correct tool
+1. **Deterministic intent parser** (`graph/intent_router.py`) — regex/keyword matching handles ~85% of inputs instantly with zero LLM dependency. Falls back to LLM for ambiguous inputs.
+2. **LLM narrator** — generates 2-sentence persona responses from tool results. The LLM never calls tools directly.
+
+The LLM's only jobs are:
+1. Classify ambiguous inputs that the deterministic parser can't handle (~15% of inputs)
 2. Generate natural-language sentences around facts that the deduction engine already computed
 
 If you find yourself adding ghost-identification logic to a prompt, you are doing it wrong. Put it in `graph/deduction.py` instead.
+
+**Model:** `qwen2.5:7b` via Ollama. phi4-mini was tested and failed — it outputs tool-call syntax as plain text instead of structured JSON. See `docs/Insights from Demonic Tutor.md` for model evaluation notes.
 
 ---
 
@@ -58,17 +64,18 @@ Using `blocking=False` alongside an active `sd.InputStream` (the loopback or mic
 ## Project Structure at a Glance
 
 ```
-graph/deduction.py   ← pure Python rules engine — no LLM, ever
-graph/tools.py       ← 8 LangChain tools; all state mutations happen here
-graph/nodes.py       ← graph nodes: llm_node, identify_node, commentary_node, etc.
-graph/graph.py       ← StateGraph wiring; don't change topology without updating tests
-graph/llm.py         ← LLM factory (Ollama → Anthropic fallback); call init_llm() once
-graph/state.py       ← OracleState TypedDict; add fields here when new sprint data needed
-graph/session_log.py ← JSONL event log; DB writes go through db/database.py separately
-db/database.py       ← SQLite CRUD; always check session_id before writing
-db/queries.py        ← read-only analytics; never mutates DB
-voice/audio_router.py← all output device routing lives here; do not bypass it
-voice/text_to_speech.py ← kokoro-onnx synthesis + AudioRouter; owns is_speaking flag
+graph/intent_router.py ← deterministic regex intent parser — handles ~85% of inputs, no LLM
+graph/deduction.py     ← pure Python rules engine — no LLM, ever
+graph/tools.py         ← 5 LangChain tools (Sprint 1); all state mutations happen here
+graph/nodes.py         ← graph nodes: parse_intent, llm_classify, execute_tool, narrate
+graph/graph.py         ← StateGraph wiring (two-stage chain); don't change topology without updating tests
+graph/llm.py           ← LLM factory (Ollama); call init_llm() once
+graph/state.py         ← OracleState TypedDict; add fields here when new sprint data needed
+graph/session_log.py   ← JSONL event log (Sprint 2+); DB writes go through db/database.py separately
+db/database.py         ← SQLite CRUD (Sprint 6); always check session_id before writing
+db/queries.py          ← read-only analytics (Sprint 6); never mutates DB
+voice/audio_router.py  ← all output device routing (Sprint 3+); do not bypass it
+voice/text_to_speech.py← kokoro-onnx synthesis (Sprint 2+); owns is_speaking flag
 config/settings.py   ← all config values; never hardcode device names or model strings
 ```
 
@@ -150,16 +157,19 @@ Evidence thresholds by difficulty (in `_EVIDENCE_THRESHOLD`):
 
 ## LLM Configuration
 
-Never instantiate `ChatOllama` or `ChatAnthropic` directly in nodes. Always use:
+**Model:** `qwen2.5:7b` via Ollama. phi4-mini was tested and **failed** — it outputs tool-call syntax as plain text instead of structured JSON that LangGraph can parse. Do not switch back to phi4-mini.
+
+Never instantiate `ChatOllama` directly in nodes. Always use:
 
 ```python
-from graph.llm import get_llm, get_commentary_llm
+from graph.llm import get_llm
 
-llm = get_llm()               # temperature=0 — tool calls and direct responses
-llm = get_commentary_llm()    # temperature=0.3 — auto-commentary prose
+llm = get_llm()               # temperature=0, tools bound
 ```
 
-`init_llm()` is called once in `main()`. It checks Ollama health, falls back to Anthropic if needed, and raises `RuntimeError` if neither is available. The `current_backend()` function returns `"ollama"` or `"anthropic"` and is used by the terminal display.
+`init_llm()` is called once in `main()`. It checks Ollama health, validates tool-call capability, and raises `RuntimeError` if unavailable. The `current_backend()` function returns `"ollama"` or `"unknown"`.
+
+**Note:** In the two-stage chain architecture, the LLM is used for narration and fallback classification only — not for direct tool calling. The deterministic intent router in `graph/intent_router.py` handles evidence parsing.
 
 ---
 
@@ -302,27 +312,23 @@ Sprint 1's `python main.py --text` smoke test is the most important regression g
 ## Quick Reference
 
 ```bash
-# Start Oracle (voice mode)
-python main.py
+# Install dependencies
+pip install -e ".[dev]"
 
-# Development mode (no microphone needed)
-python main.py --text
+# Start Oracle (text mode — Sprint 1)
+python main.py
 
 # Diagnostics
 python main.py --check
 
-# Stats
-python main.py --stats
+# Tests (no Ollama needed for most)
+pytest tests/ -m "not llm" -v
 
-# Replay session
-python main.py --replay sessions/<id>.jsonl
-python main.py --replay sessions/<id>.jsonl --re-run   # regression test
-
-# Tests (safe, no services required)
-pytest tests/test_deduction.py tests/test_triggers.py tests/test_db.py -v
+# All tests (requires Ollama with qwen2.5:7b)
+pytest tests/ -v
 
 # Pull local model (required for Ollama backend)
-ollama pull phi4-mini
+ollama pull qwen2.5:7b
 ```
 
 ---
