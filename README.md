@@ -42,40 +42,141 @@ Oracle currently runs as a text REPL with a Rich terminal display. Voice integra
 
 ---
 
-## Requirements
+## Prerequisites (First-Time Setup)
 
-- Python 3.11+
-- [Ollama](https://ollama.com) with `qwen2.5:7b` pulled
+If you've never set up a Python project before, follow this section first. If you already have Python and VS Code, skip to [Installation](#installation).
+
+### 1. Install VS Code
+
+1. Download [Visual Studio Code](https://code.visualstudio.com/) and install it.
+2. Open VS Code, go to Extensions (Ctrl+Shift+X), search for **Python**, and install the Microsoft Python extension.
+
+### 2. Install Python
+
+1. Download [Python 3.11+](https://www.python.org/downloads/) (click the big yellow "Download Python" button).
+2. **IMPORTANT:** During installation, check the box that says **"Add python.exe to PATH"**. This is the most common setup mistake — if you skip this, nothing works.
+3. After installation, open a new terminal (Command Prompt or PowerShell) and verify:
+   ```
+   python --version
+   ```
+   You should see something like `Python 3.11.9`. If you get "command not found", Python wasn't added to PATH — uninstall and reinstall with the PATH checkbox checked.
+
+### 3. Install Ollama
+
+1. Download [Ollama](https://ollama.com/) and install it.
+2. Ollama runs in the background as a service. After installation, open a terminal and verify:
+   ```
+   ollama --version
+   ```
+3. Pull the AI model Oracle uses (this downloads ~4 GB):
+   ```
+   ollama pull qwen2.5:7b
+   ```
+   This takes a few minutes. Once done, Ollama is ready.
+
+### 4. Install Git (if you don't have it)
+
+1. Download [Git for Windows](https://git-scm.com/download/win) and install with default settings.
+2. Verify: `git --version`
 
 ---
 
 ## Installation
 
+### Quick start (for experienced developers)
+
 ```bash
-# 1. Clone and enter the project
 git clone <repo-url>
 cd phasmo-oracle
-
-# 2. Create a virtual environment
 python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
-
-# 3. Install dependencies (includes dev tools like pytest)
+.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
 pip install -e ".[dev]"
-
-# 4. Pull the local model (requires Ollama running)
 ollama pull qwen2.5:7b
-
-# 5. (Optional) Copy and configure environment
-cp config/.env.local.example config/.env.local
-# Edit config/.env.local if needed — defaults work out of the box
-
-# 6. Run startup diagnostics
 python main.py --check
-
-# 7. Start Oracle
 python main.py
 ```
+
+### Step-by-step (VS Code on Windows)
+
+**1. Clone the project**
+
+Open a terminal (Command Prompt, PowerShell, or VS Code terminal) and run:
+```
+git clone <repo-url>
+cd phasmo-oracle
+```
+
+**2. Open in VS Code**
+
+```
+code .
+```
+
+This opens VS Code in the project folder. If `code .` doesn't work, open VS Code manually and use File → Open Folder.
+
+**3. Create a virtual environment**
+
+Open the VS Code terminal (Ctrl+\` or Terminal → New Terminal) and run:
+```
+python -m venv .venv
+```
+
+This creates an isolated Python environment in a `.venv` folder so Oracle's packages don't interfere with anything else on your computer.
+
+**4. Activate the virtual environment**
+
+```
+.venv\Scripts\activate
+```
+
+You should see `(.venv)` appear at the start of your terminal prompt. This means the virtual environment is active. **You need to do this every time you open a new terminal.**
+
+If you get an error about "execution of scripts is disabled", run this first:
+```
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+Then try activating again.
+
+**5. Tell VS Code to use this environment**
+
+Press Ctrl+Shift+P, type "Python: Select Interpreter", and choose the one that shows `.venv` in the path (e.g., `.\.venv\Scripts\python.exe`).
+
+**6. Install dependencies**
+
+With the virtual environment active (you should see `(.venv)` in the prompt):
+```
+pip install -e ".[dev]"
+```
+
+This installs Oracle and all its dependencies. The `.[dev]` part also installs testing tools. **If you see errors about "setuptools" or "build backend", make sure you're running this from inside the `phasmo-oracle` folder.**
+
+**7. Verify everything works**
+
+```
+python main.py --check
+```
+
+You should see green checkmarks for Ghost database, Ollama connection, and Model available. If Ollama checks fail, make sure Ollama is running (check the system tray) and you've pulled the model (`ollama pull qwen2.5:7b`).
+
+**8. Run Oracle**
+
+```
+python main.py
+```
+
+Type evidence like "ghost orb confirmed" or "rule out spirit box" and Oracle will respond.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `python: command not found` | Python wasn't added to PATH. Reinstall Python and check "Add to PATH". |
+| `pip: command not found` | Same as above — pip comes with Python. |
+| `ModuleNotFoundError` | Virtual environment isn't active. Run `.venv\Scripts\activate` first. |
+| `Ollama connection: Not reachable` | Ollama isn't running. Start it from the Start menu or system tray. |
+| `Model not pulled` | Run `ollama pull qwen2.5:7b` and wait for it to download. |
+| `execution of scripts is disabled` | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` |
+| Conda conflicts | Don't use conda. Use `python -m venv .venv` instead. Oracle is designed for venv. |
 
 ---
 
