@@ -1,0 +1,1079 @@
+# ghost_database.yaml — Oracle Knowledge Base
+# Source: Phasmophobia wiki, patch 0.15.1.0 + corrections doc
+# 27 ghosts total. Do not edit without cross-checking the official wiki.
+# Corrections applied from: "Ghost Identification Corrected Against Official Wiki"
+
+version: "0.15.1.0"
+ghost_count: 27
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVIDENCE TYPES
+# ─────────────────────────────────────────────────────────────────────────────
+
+evidence_types:
+  emf_5:      "EMF Level 5"
+  dots:       "D.O.T.S. Projector"
+  uv:         "Ultraviolet"
+  freezing:   "Freezing Temperatures"
+  orb:        "Ghost Orb"
+  writing:    "Ghost Writing"
+  spirit_box: "Spirit Box"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OBSERVATION ELIMINATORS
+# A player reporting any of these observations instantly removes listed ghosts.
+# The deduction engine applies these before calling the LLM.
+# ─────────────────────────────────────────────────────────────────────────────
+
+observation_eliminators:
+
+  ghost_is_male:
+    description: "Ghost has a male name or male model"
+    eliminates: [Banshee, Dayan]
+
+  ghost_turned_breaker_on:
+    description: "Ghost turned the breaker on by itself"
+    eliminates: [Hantu]
+
+  ghost_turned_breaker_off_directly:
+    description: "Ghost turned the breaker off directly (not via overload)"
+    eliminates: [Jinn]
+
+  ghost_turned_on_standard_light_switch:
+    description: "Ghost turned on a standard wall light switch"
+    eliminates: [Mare]
+    note: "Mare CAN turn on TVs, computers, fuse box, and motion-sensor lights — only wall switches are the eliminator"
+
+  ghost_moved_door_only_partially:
+    description: "Ghost moved a door only partway (not fully open or fully closed)"
+    eliminates: [Yurei]
+    note: "Yurei can ONLY fully open or fully close doors outside of hunts"
+
+  airball_event_observed:
+    description: "An airball ghost event (smoke ball flying at player) was observed"
+    eliminates: [Oni]
+
+  ghost_clearly_visible_in_ghost_photo:
+    description: "Ghost photo was taken during an event and ghost is clearly visible (no disappearance)"
+    eliminates: [Phantom]
+
+  ghost_changed_favorite_room:
+    description: "Ghost visibly changed its favorite room mid-investigation"
+    eliminates: [Goryo]
+    note: "Banshee removed from this list — can now change rooms as of patch 0.13.0"
+
+  dots_visible_with_naked_eye:
+    description: "D.O.T.S. silhouette seen directly (without video camera)"
+    eliminates: [Goryo]
+    note: "Goryo's D.O.T.S. is only visible through video camera"
+
+  ghost_stepped_in_salt:
+    description: "Ghost stepped in or walked over salt and left footprints"
+    eliminates: [Wraith]
+
+  ghost_hunted_from_same_room_as_player:
+    description: "Ghost initiated a hunt from the same room a player was standing in"
+    eliminates: [Shade]
+    note: "Shade cannot interact, ghost event, or hunt while any player is in the same room"
+
+  ghost_produced_four_evidence_types:
+    description: "Four distinct evidence types have been observed on standard difficulty"
+    eliminates_all_except: [The Mimic]
+    note: "Only The Mimic can produce 4 evidence types (3 real + forced Ghost Orb)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DIFFICULTY SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+difficulty:
+  standard:
+    evidence_count: 3
+    notes: "All three evidence types available"
+  nightmare:
+    evidence_count: 2
+    notes: "One random evidence type hidden. Guaranteed evidence is never hidden."
+  insanity:
+    evidence_count: 1
+    notes: "Only one evidence type visible. Guaranteed evidence is shown."
+  custom:
+    evidence_count: "0–3"
+    notes: "Player-configured"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GHOST DATABASE
+# ─────────────────────────────────────────────────────────────────────────────
+
+ghosts:
+
+  - name: Banshee
+    evidence: [dots, orb, uv]
+    guaranteed_evidence: null
+    always_gender: female
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: "Uses TARGET player's personal sanity only — not party average"
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      changes_favorite_room: true           # CORRECTION: can change rooms as of 0.13.0
+      always_female: true
+      roams_toward_target: true
+
+    behavioral_tells:
+      - "Selects one target at game start; ignores all other players during hunts"
+      - "Roams constantly toward its target even when far from ghost room"
+      - "33% chance to produce a unique high-pitched shriek on Parabolic Microphone instead of normal whisper"
+      - "More likely to trigger singing ghost events"
+      - "Hunt threshold is 50% of the TARGET's personal sanity — not party average"
+
+    community_tests:
+      - name: "Target test"
+        procedure: "Everyone stays inside. A suspected non-target holds incense visibly. If ghost walks straight past them during a hunt, it's hunting its true target — Banshee."
+        confidence: high
+      - name: "Parabolic shriek"
+        procedure: "Listen for a high-pitched shriek on Parabolic Mic instead of the normal whisper sound."
+        confidence: high
+
+  - name: Dayan
+    evidence: [emf_5, orb, spirit_box]
+    guaranteed_evidence: null
+    always_gender: female
+    fake_evidence: null
+    notes: "Added December 2025"
+
+    hunt_threshold:
+      base_pct: 50
+      condition: "65% if player is MOVING within 10m of ghost; 45% if player is STILL within 10m"
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: "2.25 m/s if player is moving within 10m; 1.2 m/s if player is still within 10m"
+
+    hard_flags:
+      always_female: true
+      movement_sensitive: true
+
+    behavioral_tells:
+      - "Within 10m bubble: moving players make it faster and more likely to hunt; still players make it slower and safer"
+      - "Outside 10m: standard speed and threshold"
+      - "LOS acceleration still builds outside range and applies when player re-enters the 10m bubble"
+      - "One of the most dangerous ghosts when players are panicking and running"
+
+    community_tests:
+      - name: "Freeze test"
+        procedure: "Stop moving completely when Dayan gets close during a hunt. Listen for audible slowdown in footsteps — that's Dayan."
+        confidence: high
+      - name: "Early hunt at high sanity"
+        procedure: "If hunts consistently trigger at ~65% sanity while a player was moving near the ghost, Dayan is top suspect."
+        confidence: high
+
+  - name: Demon
+    evidence: [writing, uv, freezing]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 70
+      condition: "Can hunt at ANY sanity using its special ability — ignore threshold for ability hunts"
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      hunt_cooldown_sec: 20       # All other ghosts: 25s
+      smudge_protection_sec: 60   # All other ghosts: 90s
+      crucifix_range_by_tier:
+        tier_1_m: 4.5
+        tier_2_m: 6.0
+        tier_3_m: 7.5
+        normal_tier_1_m: 3.0
+        normal_tier_2_m: 4.0
+        normal_tier_3_m: 5.0
+
+    behavioral_tells:
+      - "Hunt threshold is 70% average sanity — earliest standard hunter in the game"
+      - "Special ability allows hunting at ANY sanity with no threshold check"
+      - "Hunt cooldown is only 20 seconds (vs 25s standard) — hunts more frequently"
+      - "Smudge sticks only protect for 60 seconds (vs 90s standard)"
+      - "Crucifix range is 1.5x normal: 4.5m / 6m / 7.5m for Tier I / II / III"
+
+    community_tests:
+      - name: "Cooldown test"
+        procedure: "Time the gap between hunt end and next hunt start. Under 25 seconds (with no cursed hunt) = Demon."
+        confidence: high
+      - name: "Smudge test"
+        procedure: "Smudge and time until next hunt. Hunt between 60–89 seconds = likely Demon."
+        confidence: high
+      - name: "Crucifix range tell"
+        procedure: "A crucifix that burns from farther than expected strongly suggests Demon. Burning from truck wall on 42 Edgefield Rd = near certain Demon."
+        confidence: definitive
+
+  - name: Deogen
+    evidence: [dots, writing, spirit_box]
+    guaranteed_evidence: spirit_box
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 40
+      condition: null
+
+    hunt_speed:
+      base_mps: 3.0
+      condition: "3.0 m/s when >6m from player; drops to 0.4 m/s within ~2.5m"
+
+    hard_flags:
+      always_knows_player_location: true
+      hiding_is_futile: true
+      no_los_speed_boost: true
+
+    behavioral_tells:
+      - "Always knows every player's exact location — hiding is completely futile"
+      - "Charges at 3.0 m/s but slows to 0.4 m/s (near walking pace) within ~2.5m of player"
+      - "Does NOT accelerate with line-of-sight (it already knows exactly where you are)"
+      - "Spirit Box: within 1m, 33% chance produces heavy deep breathing instead of normal response"
+      - "Strategy: walk slowly around objects/furniture — it turns into a snail when close"
+
+    community_tests:
+      - name: "Don't hide"
+        procedure: "It charges straight to hiding spots. Instead loop slowly around furniture. It will slow to 0.4 m/s when near and you can outpace it."
+        confidence: definitive
+      - name: "Spirit Box breathing"
+        procedure: "Hold Spirit Box within 1m. Listen for heavy, deep breathing instead of a normal voice response — 33% chance."
+        confidence: high
+
+  - name: Gallu
+    evidence: [emf_5, uv, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+    notes: "Added December 2025. Three cycling states."
+
+    hunt_threshold:
+      base_pct: 50
+      condition: "60% when Enraged; 40% when Weakened"
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: "1.955 m/s Enraged (LOS: up to 3.23 m/s); 1.36 m/s Weakened; 1.7 m/s Normal"
+
+    hard_flags:
+      has_states: true
+      state_cycle: [Normal, Enraged, Weakened]
+      cannot_step_in_salt_when_enraged: true
+      enrage_triggers: ["crucifix burns", "incense effect ends mid-hunt", "ghost steps in salt"]
+      crucifix_range_modifier:
+        enraged: "-2 meters from standard"
+        weakened: "+1 meter from standard"
+      incense_duration_by_state:
+        normal_sec: 5
+        enraged_sec: 4
+        weakened_sec: 6
+
+    behavioral_tells:
+      - "Normal → Enraged when: crucifix burns, incense ends mid-hunt, or ghost steps in salt"
+      - "After Enraged hunt ends: becomes Weakened (slower, larger crucifix radius), then cycles back to Normal"
+      - "Cannot step in salt while Enraged — key distinguishing tell vs Wraith (which never steps in salt)"
+      - "Enraged state: faster, more aggressive, hunts earlier. Weakened: slower, easier to repel."
+
+    community_tests:
+      - name: "Salt cycle test"
+        procedure: "Ghost steps in salt → enrages (next hunt faster). After that hunt: weakened (noticeably slower). Three-step cycle confirms Gallu."
+        confidence: definitive
+      - name: "Crucifix bait"
+        procedure: "After a crucifix burns, the Gallu enrages. Next hunt is faster but shorter."
+        confidence: high
+
+  - name: Goryo
+    evidence: [dots, emf_5, uv]
+    guaranteed_evidence: dots
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      dots_camera_only: true          # D.O.T.S. only visible through video camera
+      dots_only_when_room_empty: true # Room must have no players present
+      never_changes_favorite_room: true
+      rarely_roams: true
+
+    behavioral_tells:
+      - "D.O.T.S. silhouette is ONLY visible through a video camera — never with naked eye"
+      - "D.O.T.S. only appears when no players are in the room"
+      - "Never changes favorite room (aside from Monkey Paw interference)"
+      - "Rarely roams far from its favorite room"
+
+    community_tests:
+      - name: "Camera D.O.T.S. test"
+        procedure: "Leave a camera recording the ghost room from outside. If D.O.T.S. appears on feed but never when you're physically watching, that's Goryo."
+        confidence: definitive
+      - name: "Persistent room"
+        procedure: "If the ghost room hasn't changed after a long investigation, Goryo is a candidate (but so is the old Banshee assumption — check other evidence)."
+        confidence: moderate
+
+  - name: Hantu
+    evidence: [orb, uv, freezing]
+    guaranteed_evidence: freezing
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: "2.7 m/s below 0°C; 1.4 m/s above 15°C; temperature-graduated between"
+
+    hard_flags:
+      cannot_turn_breaker_on: true
+      twice_as_likely_to_turn_breaker_off: true
+      no_los_speed_boost: true          # Does NOT speed up with line-of-sight
+      freezing_breath_when_breaker_off: true  # CORRECTION: tied to breaker being off, not room temp
+
+    behavioral_tells:
+      - "Speed is entirely temperature-driven: faster in cold rooms, slower in warm rooms"
+      - "Does NOT speed up with line of sight — can be looped in warm rooms"
+      - "Cannot turn on the breaker — seeing the ghost turn on power eliminates Hantu"
+      - "Twice as likely to turn the breaker OFF"
+      - "When breaker is OFF: emits visible freezing breath during hunts in ANY room (CORRECTION: not only cold rooms)"
+
+    community_tests:
+      - name: "Temperature speed comparison"
+        procedure: "Compare ghost speed in cold ghost room vs warm hallway. Dramatically different speeds = Hantu."
+        confidence: high
+      - name: "Freezing breath"
+        procedure: "Turn breaker off. Watch for steam/breath near ghost's head during a hunt in any room — only Hantu does this."
+        confidence: definitive
+
+  - name: Jinn
+    evidence: [emf_5, uv, freezing]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: "2.5 m/s instantly (no ramp-up) when: breaker ON + LOS + player >3m away. Slows to normal within ~2m."
+
+    hard_flags:
+      cannot_turn_breaker_off_directly: true
+      sanity_drain_ability: true
+      sanity_drain_pct: 25
+      sanity_drain_emf_source: "fuse box (EMF 2)"
+
+    behavioral_tells:
+      - "Breaker ON + chasing player >3m away = instant lock to 2.5 m/s (no gradual ramp)"
+      - "Slows to normal speed when within ~2m of player"
+      - "Cannot turn off the breaker directly (can overload it with too many lights)"
+      - "Ability: occasionally drains 25% sanity from player in same room or within 3m; leaves EMF 2 at fuse box"
+
+    community_tests:
+      - name: "Long hallway LOS test"
+        procedure: "Breaker ON. Stand at the far end of a long hallway with clear LOS. If ghost shoots to 2.5 m/s instantly without ramping up — Jinn."
+        confidence: high
+      - name: "Fuse box EMF"
+        procedure: "Place EMF reader on the breaker. Unprompted EMF reading = Jinn's sanity drain ability."
+        confidence: high
+
+  - name: Mare
+    evidence: [writing, orb, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: "60% in dark room; 40% in lit room"
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      never_turns_on_standard_light_switches: true   # CORRECTION: this is the specific eliminator
+      can_turn_on_tvs_computers_fusebox: true         # CORRECTION: can activate these
+      prefers_dark_rooms: true
+      more_likely_to_shatter_lights: true
+
+    behavioral_tells:
+      - "Will NEVER turn on a standard wall light switch — this is a definitive eliminator"
+      - "CAN turn on TVs, computers, fuse box, and motion-sensor lights (CORRECTION: not a full 'turns nothing on' rule)"
+      - "Can immediately turn lights off if a player just turned them on while the ghost is within 4m"
+      - "Hunt threshold: 60% in dark room (earlier), 40% in lit room (later)"
+      - "Roams more when lights are on; prefers and favors dark rooms"
+      - "More likely to shatter lights via ghost events"
+
+    community_tests:
+      - name: "Light switch test"
+        procedure: "Turn on a light switch while ghost is nearby. If it flips off almost immediately, that's the Mare ability (>90% confident)."
+        confidence: high
+      - name: "Fully-lit no-activation test"
+        procedure: "If ghost has never once turned on a light switch (not TV/fuse box) during a lit investigation, Mare is a strong candidate."
+        confidence: moderate
+
+  - name: Moroi
+    evidence: [writing, freezing, spirit_box]
+    guaranteed_evidence: spirit_box
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.5
+      condition: |
+        Scales with average party sanity (dynamic, updates during hunt):
+        ≥45%: 1.5 m/s
+        35–40%: 1.66 m/s
+        20–25%: 1.915 m/s
+        0–5%: 2.25 m/s (+ LOS max 3.71 m/s — fastest ghost in the game at 0% sanity)
+
+    hard_flags:
+      curse_mechanic: true
+      curse_sources: ["Spirit Box response", "Parabolic Mic whisper", "Sound Recorder recording"]
+      curse_effect: "Cursed player drains sanity 2x faster; lights no longer protect against sanity loss"
+      curse_cure: "Sanity pills"
+      incense_blind_sec: 7.5   # Normal: 5s
+
+    behavioral_tells:
+      - "Curses players who trigger Spirit Box response, hear Parabolic whisper, or use Sound Recorder"
+      - "Cursed players drain sanity at double rate even in fully lit rooms"
+      - "Fastest ghost in the game at 0% sanity (up to 3.71 m/s with LOS)"
+      - "Incense blinds Moroi for 7.5 seconds instead of normal 5 seconds"
+      - "Sanity pills cure the curse and are essential for slowing this ghost"
+
+    community_tests:
+      - name: "Pill test"
+        procedure: "Take sanity pills during a hunt when sanity is low. If the ghost audibly slows down, it's Moroi."
+        confidence: high
+      - name: "Sanity drain after Spirit Box"
+        procedure: "After a Spirit Box response, stay in a fully lit room. If sanity keeps dropping, you've been cursed → Moroi."
+        confidence: high
+
+  - name: Myling
+    evidence: [writing, emf_5, uv]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      footstep_audio_range_m: 12    # Normal: 20m
+      electronic_interference_range_m: 10  # Same as normal
+      more_parabolic_sounds: true
+
+    behavioral_tells:
+      - "Footsteps and vocalizations only audible within 12 meters (normal: 20m)"
+      - "Electronic interference range is standard 10m — so footsteps 'jump in' right when flashlight starts flickering"
+      - "You hear Myling only just as your flashlight begins to flicker — unique audio signature"
+      - "More paranormal sounds on Parabolic Microphone than other ghosts"
+
+    community_tests:
+      - name: "Footstep radius test"
+        procedure: "Hide with an active electronic on the ground. Footsteps/vocals only becoming audible right when flashlight flickers (ghost ~10m away) = Myling."
+        confidence: high
+      - name: "Distinguish from Raiju"
+        procedure: "Raiju's electronics flicker from 15m — farther than normal. Myling = flickering and footsteps arrive together. Raiju = flickering before footsteps."
+        confidence: high
+
+  - name: Obake
+    evidence: [emf_5, orb, uv]
+    guaranteed_evidence: uv
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      six_finger_print_chance_pct: 16.7
+      no_print_chance_pct: 25        # 25% chance of leaving NO fingerprints on valid interaction
+      extra_prints_on_switches: true # Two prints on light switches (normally one); five on keyboards/gates (normally four)
+      can_halve_fingerprint_duration: true
+      shapeshifts_during_hunts: true
+      shapeshift_chance_per_blink_pct: 6.66
+
+    behavioral_tells:
+      - "16.7% chance of leaving six-fingered handprints — immediate confirm if observed"
+      - "25% chance of leaving NO fingerprints at all on a valid ghost interaction"
+      - "Leaves two fingerprints on light switches (normally one); five on keyboards/prison gates (normally four)"
+      - "Can halve the remaining duration of fingerprints on the map — prints disappearing faster than 2 minutes = Obake"
+      - "During hunts: 6.66% chance per blink of briefly shapeshifting to a different ghost model; happens at least once per hunt"
+
+    community_tests:
+      - name: "Six-finger check"
+        procedure: "Shine UV on any ghost fingerprint after an interaction. Six fingers = immediate Obake confirm."
+        confidence: definitive
+      - name: "Missing print pattern"
+        procedure: "If you've seen prints from one interaction but not another from the same ghost, the 25% no-print chance is in play — suspect Obake."
+        confidence: moderate
+      - name: "Hunt model swap"
+        procedure: "Loop the ghost during a hunt and watch for a brief ghost model swap."
+        confidence: high
+
+  - name: Obambo
+    evidence: [writing, uv, dots]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+    notes: "Added December 2025. Two cycling states."
+
+    hunt_threshold:
+      base_pct: 10
+      condition: "10% when Calm; 65% when Aggressive. First switch 1 min after entering house, then every 2 min."
+
+    hunt_speed:
+      base_mps: 1.445
+      condition: "1.445 m/s Calm; 1.955 m/s Aggressive (LOS: up to 3.23 m/s — tied 2nd fastest)"
+
+    hard_flags:
+      has_states: true
+      state_cycle: [Calm, Aggressive]
+      first_switch_after_min: 1
+      switch_interval_min: 2
+      state_can_switch_mid_hunt: true
+      aggressive_hunt_duration_modifier_pct: -20   # 20% shorter hunts when Aggressive
+      calm_activity: "very high"
+      aggressive_activity: "very low"
+
+    behavioral_tells:
+      - "Calm state (10% threshold): barely hunts but extremely active with interactions and events"
+      - "Aggressive state (65% threshold): barely active but can hunt very early in session"
+      - "State can switch MID-HUNT — ghost may change speed suddenly for no apparent reason"
+      - "Aggressive hunts last 20% shorter than normal — timed hunts can confirm"
+      - "Ghost that seems extremely inactive at times then hyper-active in 2-minute cycles = Obambo"
+
+    community_tests:
+      - name: "Speed shift mid-hunt"
+        procedure: "If the ghost inexplicably changes speed during a single hunt, that's a state switch — strong Obambo indicator."
+        confidence: high
+      - name: "Hunt duration timing"
+        procedure: "Time hunt duration. If it ends 20% sooner than expected, Aggressive state Obambo."
+        confidence: high
+
+  - name: Oni
+    evidence: [dots, emf_5, freezing]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      cannot_produce_airball_event: true
+      double_sanity_drain_during_events: true   # 20% per event vs 10% normal
+      high_ghost_event_frequency: true
+      mostly_visible_during_hunt_blinks: true   # Opposite of Phantom
+
+    behavioral_tells:
+      - "CANNOT produce an airball ghost event (smoke ball flying at player) — any airball observed eliminates Oni"
+      - "Very high frequency of ghost events overall"
+      - "More likely to manifest as full visible ghost model during events (not shadow/translucent)"
+      - "Drains 20% sanity during ghost events (double the normal 10%)"
+      - "Mostly VISIBLE during hunt blinks (opposite of Phantom which is mostly invisible)"
+
+    community_tests:
+      - name: "Airball elimination"
+        procedure: "Any smoke ball (airball) event definitively eliminates Oni. Note: ghost can still hiss without an airball."
+        confidence: definitive
+      - name: "Double sanity drain"
+        procedure: "If sanity drops 20% from a single ghost event, that's Oni."
+        confidence: high
+
+  - name: Onryo
+    evidence: [orb, freezing, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 60
+      condition: "Or any sanity after the 3rd blown-out candle (forced hunt). 4th+ candle: 50% chance each."
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      cannot_light_fire_sources: true
+      flame_prevents_hunt: true      # Blows out flame instead of hunting if within 4m of flame
+      candle_priority_over_crucifix: true  # Candle on top of crucifix = crucifix is ignored
+      third_candle_blowout_forces_hunt: true
+      forced_hunt_delay_max_sec: 6   # CORRECTION: up to 6 seconds delay, not 10
+      hunt_frequency_scales_with_dead_players: true
+
+    behavioral_tells:
+      - "Cannot light fire sources (campfires, candles, fireplaces) on its own"
+      - "Will blow out a flame instead of hunting if within 4m of any lit fire source"
+      - "A lit candle placed on top of a crucifix causes the crucifix to be ignored — candle takes priority"
+      - "Every 3rd blown-out candle forces a hunt (always). 4th+ blowouts: 50% chance each."
+      - "Forced hunt after 3rd blowout can be delayed up to 6 seconds (CORRECTION from 10s)"
+      - "More hunts with each dead player"
+
+    community_tests:
+      - name: "Candle/crucifix test"
+        procedure: "High sanity. Place crucifix with lit firelight on top. Let ghost blow out candle 3 times. Hunt on 3rd blowout (with crucifix burning) = Onryo. Wait up to 6 seconds."
+        confidence: definitive
+      - name: "Distinguishing Mimic from Onryo"
+        procedure: "True Onryo always hunts after 3rd candle blowout. Mimic mimicking Onryo won't replicate this reliably."
+        confidence: high
+
+  - name: Phantom
+    evidence: [dots, uv, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      disappears_when_photographed: true
+      blink_interval_sec: "1–2"     # Normal: 0.3–1s — mostly invisible during hunts
+      sanity_drain_rate: "0.5%/sec within 10m in pseudo-line-of-sight during events and hunts"  # CORRECTION
+      special_roam_is_walk: true    # CORRECTION: physical walk, not teleport — can trigger motion sensors/salt
+
+    behavioral_tells:
+      - "Taking a ghost photo causes it to instantly disappear (photo shows no ghost, no visual disruption)"
+      - "Ghost event doesn't end but electronics stop flickering once it disappears from photo"
+      - "During hunts: blinks at 1–2 second intervals (normal: 0.3–1s) — mostly invisible"
+      - "Sanity drain: 0.5%/sec within 10m in pseudo-line-of-sight during events and hunts (CORRECTION)"
+      - "Special roam is a PHYSICAL WALK to a random player (not teleport) — CAN trigger motion sensors and disturb salt (CORRECTION)"
+      - "Mostly INVISIBLE during hunt blinks — opposite of Oni"
+
+    community_tests:
+      - name: "Photo test"
+        procedure: "Take a ghost photo during an event. If no ghost and no visual disruption in the photo = Phantom confirmed. Must be on same floor."
+        confidence: definitive
+      - name: "Blink frequency"
+        procedure: "Loop ghost during a hunt. If you see it only briefly and rarely (1–2s intervals vs 0.3–1s normal) = Phantom."
+        confidence: high
+
+  - name: Poltergeist
+    evidence: [writing, uv, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      can_throw_multiple_items_simultaneously: true
+      can_throw_items_with_lights_on: true    # Other ghosts cannot
+      hunt_throw_interval_sec: 0.5            # Rhythmic throws every 0.5s during hunt
+      throws_farther_than_other_ghosts: true
+
+    behavioral_tells:
+      - "Can throw ALL nearby items simultaneously — the 'Polter-bomb'"
+      - "Throws items much farther than any other ghost"
+      - "Can throw items even with lights ON in the room — other ghosts cannot"
+      - "During hunts: throws items every 0.5 seconds in its path (rhythmic — not random timing)"
+
+    community_tests:
+      - name: "Pile test"
+        procedure: "Spread multiple objects in and near the ghost room. Multiple objects flying simultaneously = Poltergeist."
+        confidence: high
+      - name: "Rhythmic throw test"
+        procedure: "Loop ghost around a table with objects during a hunt. Perfectly metronomic throws every half-second = Poltergeist."
+        confidence: definitive
+
+  - name: Raiju
+    evidence: [dots, emf_5, orb]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: "65% when within range of active electronics"
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: "2.5 m/s when near active electronics (fixed, not ramp-up)"
+
+    hard_flags:
+      electronic_speed_range_m: "6–10 depending on map"
+      electronic_interference_range_m: 15   # Normal: 10m
+      active_electronics_definition: ["D.O.T.S.", "EMF reader", "Spirit Box (placed)", "motion sensor"]
+      not_affected_by: ["video cameras", "photo cameras"]
+
+    behavioral_tells:
+      - "Near active electronics: speed fixed at 2.5 m/s (same as LOS-boosted Jinn)"
+      - "Electronic interference range: 15 meters (normal: 10m) — flashlight flickers from farther away"
+      - "Hunt threshold: 65% average sanity when near active electronics — hunts very early"
+      - "'Active' electronics: D.O.T.S., EMF reader, placed Spirit Box, motion sensor. NOT video/photo cameras."
+
+    community_tests:
+      - name: "Electronics interference range"
+        procedure: "Flashlight flickering when ghost is still far away (>12m) = Raiju tell. Myling flickers at ~10m; Raiju at 15m."
+        confidence: high
+      - name: "Speed near equipment"
+        procedure: "Place EMF reader or D.O.T.S. near ghost path. Listen for sudden speed increase near the device."
+        confidence: high
+      - name: "Nightmare elimination"
+        procedure: "EMF 5 + Ghost Orb combo on Nightmare is shared only by Raiju and Obake. Obake has guaranteed UV — if UV is absent, Raiju is strongly indicated."
+        confidence: high
+
+  - name: Revenant
+    evidence: [writing, orb, freezing]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.0
+      condition: "Instant 3.0 m/s upon detecting player (LOS, voice, or equipment). Returns to 1.0 m/s when reaching last known location."
+
+    hard_flags:
+      dramatic_speed_contrast: true   # Very slow roam, very fast chase — most extreme contrast
+
+    behavioral_tells:
+      - "Roam speed: 1.0 m/s (very slow — less than half of normal 1.7 m/s)"
+      - "Upon detecting a player: INSTANTLY 3.0 m/s — no ramp-up whatsoever"
+      - "Remains at 3 m/s until reaching last known player location, then decelerates back to 1 m/s"
+      - "The speed difference is unmistakable: slow shuffle then sudden train-like charge"
+      - "Hide completely (no electronics, no talking) and it wanders slowly and aimlessly"
+
+    community_tests:
+      - name: "Speed contrast observation"
+        procedure: "Listen during hunt. Slow shuffling then sudden charge at 3 m/s = Revenant. The contrast is one of the most dramatic tells in the game."
+        confidence: definitive
+      - name: "Distinguish from Jinn"
+        procedure: "Jinn is normal speed (1.7 m/s) while wandering. Revenant is half speed (1.0 m/s). Jinn doesn't slow after losing LOS; Revenant does."
+        confidence: high
+
+  - name: Shade
+    evidence: [writing, emf_5, freezing]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 35
+      condition: "One of the latest hunters in the game — won't hunt above 35%"
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      cannot_act_with_player_in_same_room: true   # Cannot interact, event, or hunt in occupied room
+      can_interact_into_room_from_adjacent: true  # CORRECTION: interaction range can cross room boundaries
+      activity_decreases_above_50pct_sanity: true
+      increased_airball_events: true
+      increased_shadow_ghost_model: true
+
+    behavioral_tells:
+      - "Cannot interact, ghost event, or hunt while ANY player is in the same room"
+      - "CAN interact INTO a player's room from an adjacent room — interaction range crosses boundaries (CORRECTION)"
+      - "Activity dramatically decreases when party sanity is above 50%"
+      - "Hunt threshold is only 35% — it hunts very late"
+      - "More likely to produce airball events and shadow ghost model appearances"
+
+    community_tests:
+      - name: "Presence test"
+        procedure: "Stand in ghost room for a long time. If the ghost never throws anything, never events, never hunts even at low sanity — almost certainly Shade."
+        confidence: high
+      - name: "Motion sensor leave test"
+        procedure: "Ghost shows activity on motion sensors when you leave but goes silent when you're in the room = Shade."
+        confidence: high
+
+  - name: Spirit
+    evidence: [writing, emf_5, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      smudge_protection_sec: 180   # 3 full minutes. Normal: 90s.
+      no_unique_behaviors: true    # Spirit is an elimination ghost
+
+    behavioral_tells:
+      - "Smudging prevents ALL hunting for 180 seconds (3 full minutes) — normal: 90s"
+      - "No other unique behaviors or tells — largely an elimination ghost"
+      - "If everything else is ruled out, Spirit is the answer"
+
+    community_tests:
+      - name: "Spirit smudge test"
+        procedure: "Smudge the ghost and start a timer. If it doesn't hunt for a full 3 minutes, Spirit is likely. (Shade can also outlast 90s — don't stand in ghost room during this test.)"
+        confidence: high
+
+  - name: Thaye
+    evidence: [dots, writing, orb]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 75
+      condition: |
+        Age 0: 75% threshold, 2.75 m/s
+        Age 10: 15% threshold, 1.0 m/s
+        CORRECTION: First age attempt 1 min after exit door is first opened.
+        Retry cadence: 1–2 min intervals when player within 3m; 30s retry when no player nearby.
+
+    hunt_speed:
+      base_mps: 2.75
+      condition: "2.75 m/s at age 0; 1.0 m/s at age 10. No LOS speed boost at any age."
+
+    hard_flags:
+      age_range: [0, 10]
+      no_los_speed_boost: true
+      first_age_attempt_after_min: 1    # CORRECTION: after exit door is first opened
+      age_retry_with_player_nearby_min: "1–2"
+      age_retry_no_player_sec: 30
+
+    behavioral_tells:
+      - "Age 0: 2.75 m/s, 75% hunt threshold — extremely fast and dangerous at start"
+      - "Age 10: 1.0 m/s, 15% hunt threshold — nearly harmless by end of investigation"
+      - "First age attempt: 1 minute after exit door is first opened (CORRECTION)"
+      - "Ages faster when players are nearby (within 3m); slow retry when no one is close"
+      - "Does NOT speed up with line of sight — loopable at any age"
+
+    community_tests:
+      - name: "Ouija age test"
+        procedure: "Ask the Ouija board for the ghost's age at investigation start, then again later. If the number increases, it's Thaye."
+        confidence: definitive
+      - name: "Activity pattern"
+        procedure: "Extremely active and fast at contract start, visibly slowing and quieting over time = Thaye."
+        confidence: high
+
+  - name: The Mimic
+    evidence: [uv, freezing, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: orb     # Always produces Ghost Orbs — even on 0-evidence difficulty
+
+    hunt_threshold:
+      base_pct: 50
+      condition: "Copies the current mimicked ghost's hunt threshold"
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: "Copies the current mimicked ghost's speed entirely"
+
+    hard_flags:
+      mimics_random_ghost: true
+      mimic_changes_every_sec: "30–120"
+      mimicry_does_not_change_during_hunt: true
+      always_has_ghost_orbs: true    # The most reliable tell — forced even on 0-evidence
+      cannot_mimic_as_evidence: ["emf_5", "writing", "dots"]  # Not its evidence types
+
+    behavioral_tells:
+      - "Always produces Ghost Orbs regardless of difficulty — this is its defining tell"
+      - "Mimics a random ghost type including ALL its abilities and behaviours"
+      - "Changes mimicked ghost every 30 seconds to 2 minutes — but never mid-hunt"
+      - "Can mimic Obake fingerprints, Onryo candle behaviour, Banshee screams — anything"
+      - "Cannot produce EMF 5, Ghost Writing, or D.O.T.S. as evidence (not its types)"
+      - "If you observe two clearly incompatible ghost behaviours in one investigation = likely Mimic"
+
+    community_tests:
+      - name: "Orb check first"
+        procedure: "Before anything else, scan ghost room on video camera. Freezing + Spirit Box + UV with ALSO orbs = 4th evidence pointing to Mimic. Do this before any other identification."
+        confidence: definitive
+      - name: "Four evidence tell"
+        procedure: "On standard difficulty: if you've confirmed 4 evidence types total, The Mimic is the only possible answer."
+        confidence: definitive
+
+  - name: The Twins
+    evidence: [emf_5, freezing, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: "1.5 m/s from actual position; 1.9 m/s from decoy position. 50/50 which starts hunt."
+
+    hard_flags:
+      dual_interaction_ranges: true
+      near_range_m_standard: 2.12
+      far_range_m_standard: 8.48
+      near_range_m_large_map: 4.24
+      far_range_m_large_map: 16.97
+      dual_interaction_chance_pct: 20   # CORRECTION: 20% chance, not constant
+      crucifix_only_covers_actual_position: true
+
+    behavioral_tells:
+      - "Two interaction ranges: near (~2.12m standard) and far (~8.48m standard)"
+      - "CORRECTION: Dual simultaneous interaction ('Twinteraction') is a 20% chance ability — not guaranteed"
+      - "Hunt speed: 1.5 m/s from actual position; 1.9 m/s from decoy position"
+      - "50/50 chance which location a hunt starts from"
+      - "Crucifixes only protect the actual ghost position — fast twin can start hunt right next to a crucifix and still burn it"
+
+    community_tests:
+      - name: "Two EMF readers"
+        procedure: "Place one EMF reader near ghost room and one in adjacent area. Both lighting up within under a second = Twins."
+        confidence: high
+      - name: "Twinteraction"
+        procedure: "Listen for interactions in two different places happening almost simultaneously."
+        confidence: high
+
+  - name: Wraith
+    evidence: [dots, emf_5, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      never_disturbs_salt: true
+      teleports_to_random_player: true
+      teleport_emf_at_origin: true
+      teleport_emf_5_chance_pct: 33   # CORRECTION: 33% chance of EMF 5 (not just EMF 2)
+
+    behavioral_tells:
+      - "NEVER disturbs salt — no footprints, no impressions, floats right over it"
+      - "Can teleport to a random player when not hunting — leaves EMF 2 at origin point"
+      - "Teleport EMF has a 33% chance of being EMF 5 instead of EMF 2 (CORRECTION)"
+      - "EMF 2 or 5 appearing in a distant room with nothing visible nearby = likely Wraith teleportation"
+
+    community_tests:
+      - name: "Salt path test"
+        procedure: "Place salt in ghost room doorway or along likely paths. Long time with no disturbance = strong Wraith indicator."
+        confidence: high
+      - name: "Definitive salt test"
+        procedure: "During a visible ghost event or D.O.T.S., place salt directly under the ghost. No footprint = Wraith confirmed."
+        confidence: definitive
+
+  - name: Yokai
+    evidence: [dots, orb, spirit_box]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: "80% if players are talking nearby; 50% otherwise"
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      voice_detection_range_m: 2.5    # Normal: 9m
+      electronics_detection_range_m: 2.5  # Normal: 7.5m
+      normal_sight_range: true        # Still sees and chases at normal range — only detection is limited
+
+    behavioral_tells:
+      - "Can only detect player voice and electronics within 2.5 meters (normal: 9m voice / 7.5m electronics)"
+      - "Normal sight range — will still see and chase at full distance"
+      - "Hunt threshold: 80% if players are talking nearby — can hunt at very high sanity near vocal players"
+      - "Essentially 'deaf' at range — won't react to noise unless you're practically on top of it"
+
+    community_tests:
+      - name: "Distance talk test"
+        procedure: "Go just out of LOS, >3m from ghost. Hold active electronic and shout. If ghost doesn't react or head toward you = likely Yokai."
+        confidence: high
+      - name: "High-sanity hunt near talking players"
+        procedure: "If ghost hunts at ~75–80% sanity while players were talking loudly nearby, suspect Yokai."
+        confidence: high
+
+  - name: Yurei
+    evidence: [dots, orb, freezing]
+    guaranteed_evidence: null
+    always_gender: null
+    fake_evidence: null
+
+    hunt_threshold:
+      base_pct: 50
+      condition: null
+
+    hunt_speed:
+      base_mps: 1.7
+      condition: null
+
+    hard_flags:
+      sanity_drain_ability: true
+      sanity_drain_range_m: 7.5
+      sanity_drain_pct: 15         # Per ability trigger
+      door_ability: "fully closes or opens a door slowly (slower than normal ghost door interactions)"
+      can_only_fully_move_doors: true   # Cannot partially move doors — the eliminator
+      smudge_room_lock_sec: 90
+
+    behavioral_tells:
+      - "Ability: drops sanity of all players within 7.5m by 15%, accompanied by a nearby door fully closing or opening slowly"
+      - "The door moves distinctly SLOWER than other ghost door interactions — a 'gentle close'"
+      - "Can ONLY fully open or fully close doors outside of hunts — never partial movement"
+      - "Smudging locks Yurei in its room for 90 seconds (test: motion sensor at doorway)"
+
+    community_tests:
+      - name: "Door speed tell"
+        procedure: "Door goes fully open to fully closed (or vice versa) and sanity drops ~15% simultaneously = Yurei ability."
+        confidence: high
+      - name: "Smudge trap"
+        procedure: "Smudge ghost, place motion sensor in doorway. No motion for 90 seconds = possible Yurei."
+        confidence: moderate

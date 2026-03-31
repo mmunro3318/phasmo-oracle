@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: ["copilot/github-copilot-dev", "main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install ruff==0.4.10
+
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install mypy and stubs
+        run: pip install mypy types-PyYAML pydantic-settings pyyaml
+
+      - name: mypy (core modules only)
+        run: mypy graph/deduction.py graph/state.py db/database.py db/queries.py --ignore-missing-imports
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install \
+            langgraph \
+            langchain-core \
+            langchain-ollama \
+            langchain-anthropic \
+            pyyaml \
+            pydantic-settings \
+            rich \
+            httpx \
+            numpy \
+            pytest \
+            pytest-cov
+
+      - name: Run tests (no LLM, no audio)
+        run: |
+          pytest tests/test_deduction.py tests/test_triggers.py tests/test_db.py tests/test_ui.py tests/test_llm.py -v --tb=short
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .coverage
+          if-no-files-found: ignore
