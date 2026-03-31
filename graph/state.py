@@ -27,6 +27,11 @@ class OracleState(TypedDict):
     eliminated_ghosts: list[str]
     candidates: list[str]
 
+    # Investigation lifecycle
+    investigation_active: bool  # False after endgame confirmation
+    identified_ghost: str | None  # Oracle's best guess (when 1 candidate remains)
+    true_ghost: str | None  # Confirmed by player at end of game
+
     # Two-stage chain state
     parsed_intent: dict  # Output of deterministic parser or LLM classifier
     tool_result: str | None  # Output of tool execution

@@ -94,6 +94,12 @@ GHOST_EVIDENCE_QUERY_PATTERNS: list[re.Pattern] = [
     re.compile(r"\b(\w+)\s+evidence\s+(?:types?|list)\b", re.IGNORECASE),
 ]
 
+ENDGAME_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\b(?:it\s+was|the\s+ghost\s+was|ghost\s+was|turned\s+out\s+to\s+be)\b", re.IGNORECASE),
+    re.compile(r"\b(?:game\s+over|investigation\s+(?:is\s+)?(?:over|done|complete|finished))\b", re.IGNORECASE),
+    re.compile(r"\b(?:we\s+(?:got\s+it|lost)|round\s+over|match\s+(?:over|done))\b", re.IGNORECASE),
+]
+
 DIFFICULTY_PATTERN = re.compile(
     r"\b(amateur|intermediate|professional|nightmare|insanity)\b", re.IGNORECASE
 )
@@ -191,6 +197,22 @@ def parse_intent(text: str) -> ParsedIntent:
             return ParsedIntent(
                 action="init_investigation",
                 difficulty=diff_match.group(1).lower() if diff_match else "professional",
+                raw_text=text,
+            )
+
+    # 1b. Endgame — "it was a Wraith", "game over"
+    for pattern in ENDGAME_PATTERNS:
+        if pattern.search(text):
+            ghost_name = _find_ghost_name(text)
+            if ghost_name:
+                return ParsedIntent(
+                    action="confirm_true_ghost",
+                    ghost_name=ghost_name,
+                    raw_text=text,
+                )
+            # "game over" without ghost name — still endgame
+            return ParsedIntent(
+                action="confirm_true_ghost",
                 raw_text=text,
             )
 

@@ -186,17 +186,17 @@ def test_explicit_elimination():
 # 7. test_mimic_survives_orb_ruled_out  (CRITICAL)
 # ---------------------------------------------------------------------------
 
-def test_mimic_survives_orb_ruled_out():
-    """The Mimic's fake_evidence is 'orb'.  Ruling out orb must NOT eliminate
-    The Mimic because orb is not real evidence for it."""
+def test_mimic_eliminated_when_orb_ruled_out():
+    """The Mimic ALWAYS produces Ghost Orbs (fake evidence). If orbs are ruled
+    out, it CANNOT be the Mimic. This is the inverse of the Mimic's special rule."""
     candidates = narrow_candidates(
         confirmed=[],
         ruled_out=["orb"],
         eliminated=[],
         difficulty="professional",
     )
-    assert "The Mimic" in candidates, (
-        "The Mimic must survive when orb is ruled out (orb is fake evidence)"
+    assert "The Mimic" not in candidates, (
+        "The Mimic must be eliminated when orb is ruled out — Mimic always produces orbs"
     )
 
 

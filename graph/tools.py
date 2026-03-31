@@ -86,6 +86,9 @@ def init_investigation(difficulty: str) -> str:
     _state["behavioral_observations"] = []
     _state["eliminated_ghosts"] = []
     _state["candidates"] = all_ghost_names()
+    _state["investigation_active"] = True
+    _state["identified_ghost"] = None
+    _state["true_ghost"] = None
     n = len(_state["candidates"])
     return f"New investigation started on {difficulty}. {n} ghost candidates active."
 
@@ -177,9 +180,14 @@ def record_evidence(evidence_id: str, status: str) -> str:
 
     parts.append(f"{n} candidate(s) remain after recording {evidence_id} as {status}: {names}")
 
-    # Identification announcement
+    # Definitive identification
     if n == 1:
-        parts.append(f"The ghost is {_state['candidates'][0]}.")
+        ghost_name = _state["candidates"][0]
+        _state["identified_ghost"] = ghost_name
+        parts.append(
+            f"IDENTIFICATION: The ghost is {ghost_name}. "
+            "Lock it in on the whiteboard and get back to the truck."
+        )
     elif n == 0:
         parts.append(
             "No ghosts match this evidence combination. "
@@ -401,6 +409,52 @@ def suggest_next_evidence() -> str:
     return " ".join(parts)
 
 
+@tool
+def confirm_true_ghost(ghost_name: str) -> str:
+    """End the investigation by confirming what the ghost actually was.
+    Call this when the player says 'it was a Wraith', 'the ghost was a Demon',
+    'game over it was a Banshee', etc.
+    """
+    ghost = get_ghost(ghost_name)
+    if not ghost:
+        all_names = [g["name"] for g in load_db()["ghosts"]]
+        return (
+            f"Ghost '{ghost_name}' not found. "
+            f"Known ghosts: {', '.join(all_names)}"
+        )
+
+    true_name = ghost["name"]
+    _state["true_ghost"] = true_name
+    _state["investigation_active"] = False
+
+    identified = _state.get("identified_ghost")
+    candidates = _state.get("candidates", [])
+    confirmed_evidence = _state.get("evidence_confirmed", [])
+    difficulty = _state.get("difficulty", "professional")
+
+    parts = [f"Investigation complete. The ghost was {true_name}."]
+
+    if identified:
+        if identified == true_name:
+            parts.append(f"Oracle correctly identified {true_name}.")
+        else:
+            parts.append(
+                f"Oracle identified {identified}, but the ghost was actually {true_name}."
+            )
+    elif true_name in candidates:
+        parts.append(f"{true_name} was among our {len(candidates)} remaining candidates.")
+    else:
+        parts.append(
+            f"{true_name} was NOT in our candidate list. "
+            "Evidence may have been recorded incorrectly."
+        )
+
+    parts.append(f"Evidence collected: {len(confirmed_evidence)} on {difficulty}.")
+    parts.append("Tell me when you're ready for a new investigation.")
+
+    return " ".join(parts)
+
+
 ORACLE_TOOLS = [
     init_investigation,
     record_evidence,
@@ -408,4 +462,5 @@ ORACLE_TOOLS = [
     get_investigation_state,
     query_ghost_database,
     suggest_next_evidence,
+    confirm_true_ghost,
 ]

@@ -72,11 +72,11 @@ def narrow_candidates(
 
         # --- Ruled-out check ---
         # A ghost is eliminated if it has any ruled-out evidence in its
-        # real evidence set. Fake evidence is NOT real — ruling out orbs
-        # does NOT eliminate the Mimic because those orbs are fake.
+        # observable set. This includes fake_evidence — if Ghost Orbs are
+        # ruled out, the Mimic is eliminated because it ALWAYS produces orbs.
         skip = False
         for e in ruled_out:
-            if e in evidence_set:
+            if e in observable_set:
                 skip = True
                 break
         if skip:
@@ -93,16 +93,17 @@ def narrow_candidates(
                     skip = True
                     break
         else:
-            # Nightmare/Insanity: ghost can hide non-guaranteed evidence.
-            # Count how many confirmed types the ghost is missing.
+            # Nightmare/Insanity: the difficulty hides some real evidence,
+            # but fake_evidence is NEVER hidden (Mimic always shows orbs).
+            # So we check against observable_set but only allow hiding from
+            # the real evidence_set.
             missing = [e for e in confirmed if e not in observable_set]
-            # A ghost can hide at most 1 evidence on Nightmare, 2 on Insanity.
-            # But it can NEVER hide its guaranteed evidence.
+            # How many real evidence types could this ghost be hiding?
             max_hidden = 1 if difficulty == "nightmare" else 2
             if len(missing) > max_hidden:
                 skip = True
             else:
-                # Check that none of the missing evidence is guaranteed
+                # Guaranteed evidence can never be hidden
                 for m in missing:
                     if m in guaranteed_set:
                         skip = True

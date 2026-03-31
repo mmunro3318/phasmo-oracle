@@ -23,6 +23,7 @@ from .tools import (
     get_investigation_state,
     query_ghost_database,
     suggest_next_evidence,
+    confirm_true_ghost,
 )
 
 logger = logging.getLogger("oracle.nodes")
@@ -82,6 +83,16 @@ def parse_intent_node(state: OracleState) -> dict:
     intent = parse_intent(state.get("user_text", ""))
     logger.info("Parsed intent: action=%s, evidence=%s, status=%s, confidence=%.1f",
                 intent.action, intent.evidence_id, intent.status, intent.confidence)
+
+    # Endgame guard: when investigation is over, only allow new game or endgame actions
+    if not state.get("investigation_active", True):
+        allowed = {"init_investigation", "confirm_true_ghost"}
+        if intent.action not in allowed:
+            return {"parsed_intent": {
+                "action": "direct_response",
+                "raw_text": "Investigation is over. Start a new investigation or tell me what the ghost was.",
+            }}
+
     return {"parsed_intent": intent.__dict__}
 
 
@@ -150,6 +161,11 @@ def execute_tool_node(state: OracleState) -> dict:
             })
         elif action == "suggest_next_evidence":
             result = suggest_next_evidence.invoke({})
+        elif action == "confirm_true_ghost":
+            ghost_name = intent.get("ghost_name", "")
+            if not ghost_name:
+                return {"tool_result": "Game over acknowledged. What was the ghost type?"}
+            result = confirm_true_ghost.invoke({"ghost_name": ghost_name})
         elif action == "record_behavioral_event":
             result = record_behavioral_event.invoke({
                 "observation": intent.get("observation", ""),

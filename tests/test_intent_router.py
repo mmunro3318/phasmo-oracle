@@ -210,6 +210,30 @@ class TestGhostEvidenceQueries:
         assert intent.ghost_name == "Spirit"
 
 
+# ── Endgame / confirm ghost ──────────────────────────────────────────────────
+
+class TestEndgame:
+    @pytest.mark.parametrize("text,expected_ghost", [
+        ("it was a Wraith", "Wraith"),
+        ("the ghost was a Demon", "Demon"),
+        ("turned out to be a Banshee", "Banshee"),
+        ("game over it was a Spirit", "Spirit"),
+    ])
+    def test_endgame_with_ghost(self, text, expected_ghost):
+        intent = parse_intent(text)
+        assert intent.action == "confirm_true_ghost"
+        assert intent.ghost_name == expected_ghost
+
+    def test_endgame_without_ghost(self):
+        intent = parse_intent("game over")
+        assert intent.action == "confirm_true_ghost"
+        assert intent.ghost_name is None
+
+    def test_investigation_over(self):
+        intent = parse_intent("investigation is over")
+        assert intent.action == "confirm_true_ghost"
+
+
 # ── LLM fallback ────────────────────────────────────────────────────────────
 
 class TestLLMFallback:
