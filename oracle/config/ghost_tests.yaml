@@ -1,0 +1,63 @@
+# Deterministic ghost tests — pass/fail checks that help identify or eliminate ghosts.
+# test_type: "positive" means the test passes if behavior IS observed.
+#            "negative" means the test passes if behavior is NOT observed.
+
+goryo:
+  description: "The Goryo cannot change favorite rooms. If the ghost changed rooms, it's not a Goryo."
+  test_type: "negative"
+
+banshee:
+  description: "The Banshee targets one player and won't switch until that player dies. If it targeted multiple players, it's not a Banshee."
+  test_type: "negative"
+
+deogen:
+  description: "The Deogen is faster when close to a player but very slow during a hunt when far away. Watch for extreme speed changes based on distance."
+  test_type: "positive"
+
+thaye:
+  description: "The Thaye ages and slows down over time during the investigation. If the ghost gets noticeably slower as time passes, it could be a Thaye."
+  test_type: "positive"
+
+revenant:
+  description: "The Revenant is very fast when it sees a player but very slow when it doesn't have line of sight. Watch for extreme speed variance."
+  test_type: "positive"
+
+wraith:
+  description: "The Wraith never steps in salt. If the ghost stepped in salt and left footprints, it's not a Wraith."
+  test_type: "negative"
+
+mare:
+  description: "The Mare hunts more often in the dark and less often with lights on. Try toggling lights to observe hunt frequency changes."
+  test_type: "positive"
+
+oni:
+  description: "The Oni is very active and throws objects with more force. If the ghost is very quiet with little activity, it's probably not an Oni."
+  test_type: "positive"
+
+phantom:
+  description: "The Phantom disappears when you take a photo of it during a ghost event. Take a photo during an event — if it vanishes, could be a Phantom."
+  test_type: "positive"
+
+jinn:
+  description: "The Jinn cannot use its speed ability when the breaker is off. Turn off the breaker and observe if the ghost loses its speed boost during hunts."
+  test_type: "positive"
+
+shade:
+  description: "The Shade is less active when players are nearby. If ghost activity drops when you're in the ghost room, it could be a Shade."
+  test_type: "positive"
+
+myling:
+  description: "The Myling produces quieter footsteps during a hunt. If you can only hear footsteps when the ghost is very close, it could be a Myling."
+  test_type: "positive"
+
+raiju:
+  description: "The Raiju moves faster near active electronics during a hunt. Place active equipment and observe speed changes."
+  test_type: "positive"
+
+obake:
+  description: "The Obake can leave unique 6-fingered handprints. Check UV fingerprints carefully for an extra finger."
+  test_type: "positive"
+
+moroi:
+  description: "The Moroi curses players through the spirit box, draining sanity faster. If sanity drops rapidly after spirit box use, it could be a Moroi."
+  test_type: "positive"
