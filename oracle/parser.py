@@ -237,6 +237,7 @@ BEHAVIOR_QUERY_PATTERNS: list[re.Pattern] = [
 TEST_QUERY_PATTERNS: list[re.Pattern] = [
     re.compile(r"\bwhat(?:'s|'s|\s+is)\s+(?:the\s+)?(\w+)\s+test\b", re.IGNORECASE),
     re.compile(r"\bwhat(?:'s|'s|\s+is)\s+the\s+test\s+for\s+(?:the\s+)?(\w+)\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+tests?\s+(?:do|can|should)\s+(?:we|i)\s+(?:have|do|run|try|perform)\s+(?:for|on)\s+(?:the\s+)?(\w+)\b", re.IGNORECASE),
     re.compile(r"\bwhat\s+tests?\s+(?:can\s+(?:we|i)\s+(?:do|run|try|perform)|should\s+(?:we|i)\s+(?:do|try))\s+(?:for|on)\s+(?:the\s+)?(\w+)\b", re.IGNORECASE),
     re.compile(r"\bhow\s+(?:do\s+(?:we|i)|can\s+(?:we|i)|to)\s+test\s+(?:for\s+)?(?:the\s+)?(\w+)\b", re.IGNORECASE),
     re.compile(r"\bwhat\s+tests?\s+(?:should\s+(?:we|i)\s+(?:try|do|run)|can\s+(?:we|i)\s+(?:try|do|run))\b", re.IGNORECASE),

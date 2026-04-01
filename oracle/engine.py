@@ -221,6 +221,7 @@ class TestResult:
     passed: bool
     eliminated_ghosts: list[str]
     remaining_count: int
+    identified_ghost: Optional[str] = None
 
 
 @dataclass
@@ -734,11 +735,25 @@ class InvestigationEngine:
                 self.difficulty,
             )
 
+        # A passed test that CONFIRMS the ghost's behavior is an identification
+        # signal — if this ghost is a current candidate, lock it in.
+        identified = None
+        should_identify = False
+        if test_type == "positive" and passed:
+            should_identify = True
+        elif test_type == "negative" and not passed:
+            should_identify = True
+
+        if should_identify and true_name in self.candidates:
+            self.identified_ghost = true_name
+            identified = true_name
+
         return TestResult(
             ghost_name=true_name,
             passed=passed,
             eliminated_ghosts=eliminated,
             remaining_count=len(self.candidates),
+            identified_ghost=identified,
         )
 
     # ── Private helpers ─────────────────────────────────────────────────

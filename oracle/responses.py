@@ -287,9 +287,19 @@ def _build_test_lookup_response(result: TestLookupResult) -> str:
 # ── Test result builder ────────────────────────────────────────────────────
 
 def _build_test_result_response(result: TestResult) -> str:
+    if result.identified_ghost:
+        return (
+            f"Test confirmed — the ghost is a {result.identified_ghost}. "
+            "Lock it in on the whiteboard."
+        )
     if result.passed and result.eliminated_ghosts:
         return (
             f"Test passed. Eliminated: {_ghost_list(result.eliminated_ghosts)}. "
+            f"{result.remaining_count} candidates remain."
+        )
+    if not result.passed and result.eliminated_ghosts:
+        return (
+            f"Test failed. Eliminated: {_ghost_list(result.eliminated_ghosts)}. "
             f"{result.remaining_count} candidates remain."
         )
     if result.passed:
