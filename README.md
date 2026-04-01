@@ -122,20 +122,6 @@ cd phasmo-oracle
 git fetch origin
 git checkout claude-code-dev
 ```
-### Voice Tester (Experimental)
-
-Want to hear the Oracle speak? Check out the **`voice_test/`** sub-app on the `feature/voice-test-app` branch.
-
-It's a standalone terminal tool that plays Phasmophobia-themed dispatches through any Kokoro ONNX voice. Model files download automatically on first run.
-
-**Quick start:**
-```bash
-git checkout feature/voice-test-app
-pip install -r voice_test/requirements.txt
-python voice_test/app.py
-```
-
-See [`voice_test/README.md`](voice_test/README.md) for full setup details (including how to configure your audio output device).
 
 **2. Open in VS Code**
 
@@ -198,6 +184,21 @@ You should see green checkmarks for Ghost database, Ollama connection, and Model
 ```
 python main.py
 ```
+
+### Voice Tester (Experimental)
+
+Want to hear the Oracle speak? Check out the **`voice_test/`** sub-app on the `feature/voice-test-app` branch.
+
+It's a standalone terminal tool that plays Phasmophobia-themed dispatches through any Kokoro ONNX voice. Model files download automatically on first run.
+
+**Quick start:**
+```bash
+git checkout feature/voice-test-app
+pip install -r voice_test/requirements.txt
+python voice_test/app.py
+```
+
+See [`voice_test/README.md`](voice_test/README.md) for full setup details (including how to configure your audio output device).
 
 Type evidence like "ghost orb confirmed" or "rule out spirit box" and Oracle will respond.
 
