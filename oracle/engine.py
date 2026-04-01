@@ -673,7 +673,8 @@ class InvestigationEngine:
 
         true_name = ghost["name"]
         tests = _load_ghost_tests()
-        test_entry = tests.get(true_name)
+        # YAML keys are lowercase; ghost DB names are title case
+        test_entry = tests.get(true_name) or tests.get(true_name.lower())
 
         if not test_entry:
             return TestLookupResult(
@@ -802,7 +803,8 @@ class InvestigationEngine:
             )
         ):
             self.investigation_phase = "evidence"
-            return True
+            # Return False — this is a rollback, not a forward phase shift.
+            # The response should NOT say "time for behavioral tests."
 
         return False
 
