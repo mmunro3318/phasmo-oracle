@@ -40,6 +40,8 @@ user_text → Deterministic Parser (regex, instant)
 
 Oracle currently runs as a text REPL with a Rich terminal display. Voice integration (Whisper STT, Kokoro TTS, wake word detection) is planned for Sprint 2.
 
+Added a quick sub-app/applet `voice-test` that can be set up to run and hear the different voices available through Kokoro before I fully wire it up in Sprint 2. Instructions below.
+
 ---
 
 ## Prerequisites (First-Time Setup)
@@ -107,9 +109,12 @@ python main.py
 
 **1. Clone the project**
 
-Open a terminal (Command Prompt, PowerShell, or VS Code terminal) and run:
+Open a terminal (Command Prompt, PowerShell, or **VS Code terminal**) and run:
 
 ```
+# Navigate to where you want to store the project, for example:
+cd C:/Users/[username]/Desktop/Projects
+
 git clone https://github.com/mmunro3318/phasmo-oracle.git
 cd phasmo-oracle
 
@@ -117,6 +122,20 @@ cd phasmo-oracle
 git fetch origin
 git checkout claude-code-dev
 ```
+### Voice Tester (Experimental)
+
+Want to hear the Oracle speak? Check out the **`voice_test/`** sub-app on the `feature/voice-test-app` branch.
+
+It's a standalone terminal tool that plays Phasmophobia-themed dispatches through any Kokoro ONNX voice. Model files download automatically on first run.
+
+**Quick start:**
+```bash
+git checkout feature/voice-test-app
+pip install -r voice_test/requirements.txt
+python voice_test/app.py
+```
+
+See [`voice_test/README.md`](voice_test/README.md) for full setup details (including how to configure your audio output device).
 
 **2. Open in VS Code**
 
