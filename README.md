@@ -1,10 +1,78 @@
 # Oracle
 
-A voice-driven Phasmophobia ghost-identification assistant. Oracle listens for evidence reports and observations, narrows the ghost candidate pool deterministically, and responds with dry British wit.
+A voice-driven Phasmophobia ghost-identification assistant. Oracle narrows 27 ghost candidates using evidence you report, then responds through a CB radio voice effect.
+
+> **Note:** The sections below this quick-start guide are from an earlier sprint and reference LangGraph/LLM architecture that has been replaced. See `CLAUDE.md` for current architecture. A full README rewrite is planned.
 
 ---
 
-## How It Works
+## Quick Start (Sprint 3b)
+
+```bash
+git clone https://github.com/mmunro3318/phasmo-oracle.git
+cd phasmo-oracle
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e ".[dev,voice]"     # voice output with radio FX
+python -m oracle --text --speak --difficulty professional
+```
+
+Model files (~90MB) download automatically on first run.
+
+---
+
+## Command Reference
+
+Oracle uses pattern matching — phrase commands naturally. Here's what works:
+
+### Evidence
+
+| What you say | What happens |
+|-------------|-------------|
+| `confirm EMF 5` | Records EMF 5 as confirmed |
+| `we found ghost orbs` | Records Ghost Orb as confirmed |
+| `rule out spirit box` | Rules out Spirit Box |
+| `no freezing temps` | Rules out Freezing Temperatures |
+| `deny ghost writing` | Rules out Ghost Writing |
+
+**Tip:** You can say evidence names casually — "orbs", "freezing", "UV", "dots", "writing", "spirit box", "EMF" all work.
+
+### Investigation
+
+| What you say | What happens |
+|-------------|-------------|
+| `what's left` / `status` | Shows remaining candidates |
+| `what should we check next` | Suggests the most useful evidence to test |
+| `what tests can we try` | Lists available tests for remaining ghosts |
+
+### Ghost Info
+
+| What you say | What happens |
+|-------------|-------------|
+| `tell me about the Banshee` | Ghost card — evidence, behaviors, tests |
+| `what's the Goryo test` | Specific ghost test lookup |
+| `Goryo test passed` / `failed` | Records test result, may eliminate ghost |
+
+### Guessing & Endgame
+
+| What you say | What happens |
+|-------------|-------------|
+| `I think it's a Deogen` | Records your theory |
+| `lock in Deogen` | Locks in your final answer |
+| `game over it was a Wraith` | Ends the game, records result |
+| `new game nightmare` | Starts a fresh investigation |
+
+### Voice
+
+| What you say | What happens |
+|-------------|-------------|
+| `change voice to af_bella` | Switches Oracle's voice |
+
+Voice names are shown in "The Team" table at startup. Set a default in `.env.local` with `KOKORO_VOICE=bm_fable`.
+
+---
+
+## How It Works (Legacy — see CLAUDE.md for current architecture)
 
 Oracle is a **LangGraph agent with a two-stage chain**, not a raw LLM. The architecture separates three concerns:
 

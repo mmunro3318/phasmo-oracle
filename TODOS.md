@@ -1,30 +1,51 @@
 # TODOS
 
-## Kokoro short-sentence padding
-**Priority:** P1 | **Effort:** S (CC: ~10 min) | **Sprint:** 3b (voice)
+## Kokoro TTS latency benchmark
+**Priority:** P1 | **Effort:** S (CC: ~15 min) | **Sprint:** Post-3b
 
-kokoro-onnx produces poor audio quality for very short sentences (<8 phonemes). The response builder already has `_ensure_minimum_length()` which pads responses under 40 characters. When integrating TTS in Sprint 3b, verify this padding is sufficient for natural-sounding audio. May need to tune the threshold or add prosody hints.
+Kokoro-onnx (82M params) CPU latency is unvalidated on target hardware. Estimated 200ms but could be 400-600ms. Need real measurements to decide if DirectML acceleration or a different TTS backend is needed.
 
-**Where to start:** Test all response templates through kokoro-onnx and flag any that sound bad. Adjust padding or rewrite templates as needed.
+**Where to start:** See `BENCHMARK_GUIDE.md` for step-by-step instructions and the benchmark script. Test both CPU and DirectML (if available). Measure across short (10-50 char) and long (100+ char) utterances.
+
+---
+
+## CLAUDE.md + docs review with /document-release
+**Priority:** P2 | **Effort:** S (CC: ~15 min) | **Sprint:** Post-3b
+
+After Sprint 3b ships, run `/document-release` to fully review and update CLAUDE.md, README, and other docs. AGENTS.md was archived — CLAUDE.md needs to be the definitive project guide with voice-specific guidance for future sessions.
+
+**Where to start:** Run `/document-release` in a fresh session.
 
 ---
 
 ## Voice I/O async pattern
-**Priority:** P1 | **Effort:** M (CC: ~30 min) | **Sprint:** 3b (voice)
+**Priority:** P1 | **Effort:** M (CC: ~30 min) | **Sprint:** 3c (voice input)
 
-The current `InputProvider`/`OutputHandler` protocols are synchronous (text mode). Voice mode involves async operations: wake word listening (continuous), streaming STT, TTS playback. Sprint 3b's `VoiceInput` will likely need `async get_command()` or a callback pattern. The runner loop may need an async variant.
+The current `InputProvider`/`OutputHandler` protocols are synchronous (text mode). Voice mode involves async operations: wake word listening (continuous), streaming STT, TTS playback. Sprint 3c's `VoiceInput` will likely need `async get_command()` or a callback pattern. The runner loop may need an async variant.
 
-**Where to start:** Design the voice state machine (IDLE -> LISTENING -> PROCESSING) and decide whether to use asyncio, threading, or callback pattern.
+**Where to start:** Design the voice state machine (IDLE -> LISTENING -> PROCESSING) and decide whether to use asyncio, threading, or callback pattern. Note: `sd.play()` must switch to `blocking=True` when InputStream (STT) is added.
 
 ---
 
 ## Ghost test completeness audit
-**Priority:** P2 | **Effort:** S (CC: ~15 min) | **Sprint:** 3b+
+**Priority:** P2 | **Effort:** S (CC: ~15 min) | **Sprint:** 3b (bundled)
 
-`ghost_tests.yaml` currently covers 15 of 27 ghosts. Audit the Ghost ID Guide for all testable behaviors and add missing entries. Some ghosts may not have reliable deterministic tests.
+`ghost_tests.yaml` currently covers 15 of 27 ghosts. Audit the Ghost ID Guide for all testable behaviors and add missing entries. Some ghosts may not have reliable deterministic tests — mark those with `no_test: true`.
 
 **Where to start:** Read `docs/Ghost Identification Guide.md` and cross-reference with existing entries in `oracle/config/ghost_tests.yaml`.
 
 ---
 
+## Ghost card deep narrative parser
+**Priority:** P2 | **Effort:** S (CC: ~20 min) | **Sprint:** Post-3b
+
+The ghost query response builder (`responses.py:_build_ghost_query_response`) handles top-level fields well (evidence, guaranteed, tells, community tests). But ghost_database.yaml has nested structures (behavioral_profile dicts, speed values with units, multi-step procedures) that may leak raw YAML formatting (curly brackets, colons) into spoken output.
+
+**Solution:** Write a recursive `_flatten_to_prose(value)` helper that walks nested dicts/lists and produces natural sentences. For dicts: join "key is value" pairs. For lists: join with commas. For strings: pass through. Apply it in the ghost query builder anywhere raw YAML values are interpolated.
+
+**Where to start:** Run `python -m oracle --text --speak` and query each of the 27 ghosts with "tell me about {ghost}". Flag any responses that read YAML formatting aloud. Fix the deepest offenders first (behavioral_profile, community_tests).
+
+---
+
 *Pre-pivot TODOs archived to `archive/TODOS-pre-pivot.md`*
+*Kokoro short-sentence padding: RESOLVED in `oracle/voice/tts.py` (200ms audio-level gate)*

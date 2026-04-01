@@ -274,6 +274,7 @@ class ParsedIntent:
     player_name: str | None = None
     player_names: list[str] = field(default_factory=list)
     confidence: float = 1.0
+    voice_name: str | None = None
     raw_text: str = ""
     extra_evidence: list[str] = field(default_factory=list)
 
@@ -328,6 +329,20 @@ def parse_intent(text: str) -> ParsedIntent:
                 difficulty=diff_match.group(1).lower() if diff_match else "professional",
                 raw_text=text,
             )
+
+    # 1a. Voice change — "change voice to bm_fable", "use voice af_sarah"
+    voice_match = re.search(
+        r"\b(?:change|switch|set|use)\b.*\bvoice\b.*\bto\s+(\w+)"
+        r"|\bvoice\s+(\w+)",
+        text, re.IGNORECASE,
+    )
+    if voice_match:
+        voice_name = voice_match.group(1) or voice_match.group(2)
+        return ParsedIntent(
+            action="change_voice",
+            voice_name=voice_name.strip().lower(),
+            raw_text=text,
+        )
 
     # 1b. Endgame — "it was a Wraith", "game over"
     for pattern in ENDGAME_PATTERNS:

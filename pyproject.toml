@@ -18,12 +18,15 @@ dev = [
     "pytest>=8.0",
 ]
 voice = [
-    "faster-whisper>=1.0",
-    "kokoro-onnx>=0.4",
-    "openwakeword>=0.6",
+    "kokoro-onnx>=0.4,<1.0",
     "sounddevice>=0.4",
     "scipy>=1.11",
     "numpy>=1.24",
+]
+voice-full = [
+    "phasmo-oracle[voice]",
+    "faster-whisper>=1.0",
+    "openwakeword>=0.6",
 ]
 
 [project.scripts]

@@ -7,8 +7,8 @@
 
 Oracle is a Phasmophobia ghost-identification voice assistant. A deterministic regex parser handles ~90% of inputs instantly. A pure Python deduction engine handles all candidate narrowing. Scripted response templates produce all output text. No LLM dependencies in the core pipeline.
 
-**Current sprint:** Sprint 3a — Voice-First Pivot (Text Mode)
-**Next:** Sprint 3b — Voice Pipeline (STT + TTS + Wake Word + Radio FX)
+**Current sprint:** Sprint 3b — Voice Output (TTS + Radio FX)
+**Next:** Sprint 3c — Voice Input (STT + Wake Word + Async State Machine)
 
 ## Hard Invariants — Never Break These
 
@@ -21,18 +21,35 @@ Oracle is a Phasmophobia ghost-identification voice assistant. A deterministic r
 ## Build / Test / Run
 
 ```bash
-# Install dependencies
+# Install dependencies (text only)
 pip install -e ".[dev]"
 
-# Run all tests
+# Install with voice output
+pip install -e ".[dev,voice]"
+
+# Run all tests (voice tests use mocks — no audio hardware needed)
 pytest tests/ -v
+
+# Run integration tests that need real Kokoro model
+pytest tests/ -v --run-integration
 
 # Start Oracle (text mode)
 python -m oracle --text --difficulty professional
 
-# Or via entry point
-oracle --text
+# Start Oracle with voice output (CB radio FX)
+python -m oracle --text --speak --difficulty professional
+
+# Preview radio FX (standalone tuning tool)
+python tools/radio_preview.py
 ```
+
+### Voice Testing Notes
+
+- Voice unit tests mock Kokoro and sounddevice — they run without audio deps
+- Tests marked `@pytest.mark.integration` need real Kokoro model files
+- All 488+ tests should pass with `pytest tests/ -v` (no voice deps needed)
+- Audio invariant: all audio is float32, clipped to [-1.0, 1.0] before playback
+- Sprint 3c note: when adding InputStream (STT), switch `sd.play()` to `blocking=True`
 
 ## Architecture — Deterministic Pipeline
 
@@ -49,7 +66,7 @@ user_text → parser.py (regex + fuzzy matching, instant)
          responses.py (typed result → scripted string template)
                 |
                 v
-         output (Rich terminal / TTS in Sprint 3b)
+         output (Rich terminal + optional TTS with radio FX)
 ```
 
 ### File responsibilities
@@ -64,6 +81,9 @@ user_text → parser.py (regex + fuzzy matching, instant)
 - `oracle/config/ghost_database.yaml` — 27 ghosts. Source of truth for evidence/eliminators.
 - `oracle/config/evidence_synonyms.yaml` — Maps spoken/typed evidence strings to canonical IDs.
 - `oracle/config/ghost_tests.yaml` — Deterministic ghost tests (pass/fail).
+- `oracle/voice/tts.py` — TTSProvider protocol + Kokoro-onnx wrapper. Swappable TTS backend.
+- `oracle/voice/radio_fx.py` — CB radio FX chain (band-pass, saturation, limiter, noise, assets). Composable stages.
+- `oracle/voice/audio_config.py` — Audio pipeline constants. Each FX stage independently toggleable.
 
 ## Key Design Decisions
 

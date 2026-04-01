@@ -126,6 +126,8 @@ class EvidenceResult:
     identification_triggered: bool
     phase_shifted: bool
     commentary_needed: bool
+    # Ghosts eliminated by guaranteed evidence at threshold
+    guaranteed_eliminated: list[str] = dc_field(default_factory=list)
 
 
 @dataclass
@@ -235,6 +237,22 @@ class PlayerRegistrationResult:
     """Returned by register_players()."""
     added: list[str]
     total: int
+
+
+@dataclass
+class AvailableTestsResult:
+    """Returned when player asks which remaining ghosts have tests."""
+    testable: list[tuple[str, str]]  # (ghost_name, test_description)
+    untestable: list[str]            # ghosts with no test
+    total_candidates: int
+
+
+@dataclass
+class VoiceChangeResult:
+    """Returned when the player changes Oracle's voice."""
+    voice_name: str
+    success: bool
+    available_voices: list[str] = dc_field(default_factory=list)
 
 
 # ── InvestigationEngine ─────────────────────────────────────────────────────
@@ -352,6 +370,16 @@ class InvestigationEngine:
         threshold_reached = evidence_threshold_reached(
             self.evidence_confirmed, self.difficulty
         )
+
+        # At threshold, eliminate ghosts whose guaranteed evidence wasn't found
+        guaranteed_eliminated: list[str] = []
+        if threshold_reached:
+            before = set(self.candidates)
+            self.candidates = eliminate_by_guaranteed_evidence(
+                self.candidates, self.evidence_confirmed, self.difficulty
+            )
+            guaranteed_eliminated = sorted(before - set(self.candidates))
+
         mimic_detected = self._check_mimic(evidence_id, status)
         over_proofed = self._check_over_proofed(status)
         zero_candidates = len(self.candidates) == 0
@@ -393,6 +421,7 @@ class InvestigationEngine:
             identification_triggered=identification_triggered,
             phase_shifted=phase_shifted,
             commentary_needed=commentary_needed,
+            guaranteed_eliminated=guaranteed_eliminated,
         )
 
     def record_behavioral(
@@ -660,6 +689,25 @@ class InvestigationEngine:
             total=len(self.players),
         )
 
+    def available_tests(self) -> AvailableTestsResult:
+        """List which remaining candidates have deterministic tests."""
+        tests = _load_ghost_tests()
+        testable = []
+        untestable = []
+
+        for name in self.candidates:
+            entry = tests.get(name) or tests.get(name.lower())
+            if entry and entry.get("description"):
+                testable.append((name, entry["description"]))
+            else:
+                untestable.append(name)
+
+        return AvailableTestsResult(
+            testable=testable,
+            untestable=untestable,
+            total_candidates=len(self.candidates),
+        )
+
     def ghost_test_lookup(self, ghost_name: str) -> TestLookupResult:
         """Look up a deterministic ghost test from ghost_tests.yaml."""
         ghost = get_ghost(ghost_name)
@@ -786,13 +834,20 @@ class InvestigationEngine:
         return status_changed, old_status
 
     def _check_mimic(self, evidence_id: str, status: str) -> bool:
-        """Detect Mimic: orbs confirmed and Mimic still a candidate."""
-        return (
-            status == "confirmed"
-            and evidence_id == "orb"
-            and "The Mimic" in self.candidates
-            and len(self.candidates) > 1
-        )
+        """Detect Mimic: orbs confirmed + more evidence than threshold allows.
+
+        The Mimic has 3 real evidence types + orb (fake). The tell is that
+        the player has confirmed MORE evidence than the difficulty allows —
+        the extra piece is the fake orb. On Professional (threshold=3),
+        this means 4 confirmed. On Nightmare (threshold=2), 3 confirmed.
+        """
+        if status != "confirmed" or "orb" not in self.evidence_confirmed:
+            return False
+        if "The Mimic" not in self.candidates:
+            return False
+
+        threshold = EVIDENCE_THRESHOLDS.get(self.difficulty, 3)
+        return len(self.evidence_confirmed) > threshold
 
     def _check_over_proofed(self, status: str) -> bool:
         """Detect over-proofed: more confirmed evidence than threshold allows."""

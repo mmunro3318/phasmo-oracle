@@ -12,6 +12,7 @@ from __future__ import annotations
 import random
 
 from oracle.engine import (
+    EVIDENCE_LABELS,
     NewGameResult,
     EvidenceResult,
     BehavioralResult,
@@ -25,6 +26,8 @@ from oracle.engine import (
     TestResult,
     UnknownCommandResult,
     PlayerRegistrationResult,
+    VoiceChangeResult,
+    AvailableTestsResult,
 )
 
 # ── Minimum length enforcement ──────────────────────────────────────────────
@@ -82,8 +85,9 @@ def _build_evidence_response(result: EvidenceResult) -> str:
 
     # Mimic detection
     if result.mimic_detected:
+        count = len([e for e in result.candidates]) + 1  # approximate
         parts.append(
-            "Four pieces of evidence with orbs — that's a Mimic. "
+            "More evidence than expected, and orbs are confirmed — that's a Mimic. "
             "The orb is fake evidence. Locking it in."
         )
         return " ".join(parts)
@@ -105,18 +109,17 @@ def _build_evidence_response(result: EvidenceResult) -> str:
 
     # Threshold reached with multiple candidates + phase shifted
     if result.phase_shifted:
-        templates = [
-            (
-                f"That's our evidence limit. "
-                f"Remaining options: {_ghost_list(result.candidates)}. "
-                f"Time for behavioral tests."
-            ),
-            (
-                f"That's it for evidence. Our options are "
-                f"{_ghost_list(result.candidates)}. Time for behavioral tests."
-            ),
-        ]
-        parts.append(random.choice(templates))
+        msg = (
+            f"That's our evidence limit. "
+            f"Remaining options: {_ghost_list(result.candidates)}. "
+        )
+        if result.guaranteed_eliminated:
+            msg += (
+                f"Eliminated {len(result.guaranteed_eliminated)} based on missing "
+                f"guaranteed evidence: {_ghost_list(result.guaranteed_eliminated)}. "
+            )
+        msg += "Time for behavioral tests."
+        parts.append(msg)
         return " ".join(parts)
 
     # Normal confirm / rule-out
@@ -174,27 +177,69 @@ def _build_state_response(result: StateResult) -> str:
 def _build_ghost_query_response(result: GhostQueryResult) -> str:
     if not result.found:
         if result.all_ghost_names:
-            return f"Ghost '{result.ghost_name}' not found. Known ghosts: {_ghost_list(result.all_ghost_names)}"
-        return f"Ghost '{result.ghost_name}' not found."
+            return f"I don't have a file on '{result.ghost_name}'. Check the name and try again."
+        return f"I don't have a file on '{result.ghost_name}'."
 
-    # Full card
-    lines = [f"Ghost: {result.ghost_name}"]
+    parts: list[str] = []
 
-    if result.evidence_list:
-        lines.append(f"Evidence: {_evidence_list(result.evidence_list)}")
-    if result.evidence_status:
-        status_parts = [f"  {ev}: {st}" for ev, st in result.evidence_status.items()]
-        lines.append("Evidence status:\n" + "\n".join(status_parts))
+    # Opening — name + evidence
+    evidence_str = _evidence_list(result.evidence_list) if result.evidence_list else "unknown"
+    parts.append(f"The {result.ghost_name}. Evidence: {evidence_str}.")
+
+    # Guaranteed evidence
     if result.guaranteed_evidence:
-        lines.append(f"Guaranteed evidence: {result.guaranteed_evidence}")
-    if result.tells:
-        lines.append(f"Tells: {_evidence_list(result.tells)}")
-    if result.community_tests:
-        lines.append("Community tests:")
-        for test in result.community_tests:
-            lines.append(f"  - {test}")
+        ge_label = EVIDENCE_LABELS.get(result.guaranteed_evidence, result.guaranteed_evidence)
+        parts.append(f"{ge_label} is guaranteed — it always shows up.")
 
-    return "\n".join(lines)
+    # Evidence status in current investigation
+    if result.evidence_status:
+        confirmed = [ev for ev, st in result.evidence_status.items() if st == "CONFIRMED"]
+        untested = [ev for ev, st in result.evidence_status.items() if st == "untested"]
+        if confirmed:
+            parts.append(f"We've already confirmed {_evidence_list(confirmed)}.")
+        if untested:
+            parts.append(f"Still need to check {_evidence_list(untested)}.")
+
+    # Behavioral tells — conversational summary (not a raw dump)
+    if result.tells:
+        # Take the first 2-3 tells for voice brevity, skip deeply technical ones
+        clean_tells = []
+        for tell in result.tells[:3]:
+            # Strip dict-like formatting if a tell somehow contains it
+            t = str(tell).strip()
+            if t.startswith("{") or t.startswith("["):
+                continue
+            clean_tells.append(t)
+        if len(clean_tells) == 1:
+            parts.append(f"Key behavior: {clean_tells[0]}.")
+        elif clean_tells:
+            joined = ". ".join(clean_tells)
+            parts.append(f"Key behaviors: {joined}.")
+
+    # Community tests — narrative (unwrap dict fields into prose)
+    if result.community_tests:
+        for test in result.community_tests:
+            if isinstance(test, dict):
+                name = test.get("name", "")
+                procedure = test.get("procedure", test.get("description", ""))
+                confidence = test.get("confidence", "")
+                line = f"Community test"
+                if name:
+                    line += f" — {name}"
+                if procedure:
+                    line += f": {procedure}"
+                if confidence:
+                    line += f" Confidence: {confidence}."
+                parts.append(line)
+            else:
+                parts.append(f"Community test: {test}")
+
+    # Fake evidence (Mimic)
+    if result.fake_evidence:
+        fe_label = EVIDENCE_LABELS.get(result.fake_evidence, result.fake_evidence)
+        parts.append(f"Watch out — it fakes {fe_label} as extra evidence.")
+
+    return " ".join(parts)
 
 
 # ── Suggestion builder ──────────────────────────────────────────────────────
@@ -331,6 +376,35 @@ def _build_player_registration_response(result: PlayerRegistrationResult) -> str
     )
 
 
+# ── Available tests builder ────────────────────────────────────────────────
+
+def _build_available_tests_response(result: AvailableTestsResult) -> str:
+    if not result.testable:
+        return "None of the remaining candidates have known tests. Focus on evidence and behavioral observations."
+
+    parts = [f"{len(result.testable)} of {result.total_candidates} remaining ghosts have tests."]
+    for name, desc in result.testable:
+        parts.append(f"{name}: {desc}")
+
+    if result.untestable:
+        parts.append(f"No tests for: {_ghost_list(result.untestable)}.")
+
+    return " ".join(parts)
+
+
+# ── Voice change builder ───────────────────────────────────────────────────
+
+def _build_voice_change_response(result: VoiceChangeResult) -> str:
+    if result.success:
+        # Extract the display name (e.g. "bm_fable" → "Fable")
+        name = result.voice_name.split("_", 1)[-1].capitalize()
+        return f"This is {name}, taking over. Ready when you are."
+    return (
+        f"Unknown voice: {result.voice_name}. "
+        f"Available voices: {', '.join(result.available_voices)}."
+    )
+
+
 # ── Dispatch table ──────────────────────────────────────────────────────────
 
 _BUILDERS = {
@@ -347,6 +421,8 @@ _BUILDERS = {
     TestResult: _build_test_result_response,
     UnknownCommandResult: _build_unknown_command_response,
     PlayerRegistrationResult: _build_player_registration_response,
+    VoiceChangeResult: _build_voice_change_response,
+    AvailableTestsResult: _build_available_tests_response,
 }
 
 

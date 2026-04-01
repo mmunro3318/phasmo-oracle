@@ -2,6 +2,10 @@
 docs/notes.md
 docs/workspace.md
 
+# Kokoro TTS model files (auto-downloaded on first run)
+*.onnx
+voices-v1.0.bin
+
 # Python
 __pycache__/
 *.py[cod]

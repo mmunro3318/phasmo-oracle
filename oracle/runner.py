@@ -1,11 +1,12 @@
 """Oracle runner — main loop with I/O protocols.
 
-Supports text mode (--text) now and voice mode (Sprint 3b) later.
+Supports text mode (--text) and voice output (--speak).
 The I/O protocols allow swapping input/output without touching the loop.
 """
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from typing import Protocol
 
@@ -28,6 +29,8 @@ from oracle.engine import (
     NewGameResult,
     UnknownCommandResult,
     PlayerRegistrationResult,
+    VoiceChangeResult,
+    AvailableTestsResult,
 )
 from oracle.parser import parse_intent, ParsedIntent
 from oracle.responses import build_response
@@ -120,6 +123,113 @@ class RichOutput:
             )
         )
 
+    def _show_voice_table(self, current_voice: str) -> None:
+        """Display available Kokoro voices in a table."""
+        from rich.table import Table
+        from oracle.voice.audio_config import BRITISH_VOICES, AMERICAN_VOICES
+
+        table = Table(
+            title="[bold cyan]The Team[/bold cyan]",
+            show_header=True,
+            header_style="bold magenta",
+            min_width=44,
+        )
+        table.add_column("British", style="cyan", no_wrap=True)
+        table.add_column("American", style="green", no_wrap=True)
+
+        max_rows = max(len(BRITISH_VOICES), len(AMERICAN_VOICES))
+        for i in range(max_rows):
+            gb = BRITISH_VOICES[i] if i < len(BRITISH_VOICES) else ""
+            us = AMERICAN_VOICES[i] if i < len(AMERICAN_VOICES) else ""
+            # Mark current voice
+            if gb == current_voice:
+                gb = f"[bold yellow]> {gb}[/bold yellow]"
+            if us == current_voice:
+                us = f"[bold yellow]> {us}[/bold yellow]"
+            table.add_row(gb, us)
+
+        self._console.print(table)
+        self._console.print(
+            "[dim]Change voice: [cyan]'change voice to bm_george'[/cyan][/dim]\n"
+        )
+
+
+logger = logging.getLogger(__name__)
+
+
+# ── Voice Output ──────────────────────────────────────────────────────────
+
+
+class VoiceOutput:
+    """OutputHandler that adds TTS + radio FX to text responses.
+
+    Wraps RichOutput via composition. Only show_response() adds audio —
+    show_state() and show_welcome() delegate directly to text display.
+    """
+
+    def __init__(self, engine: InvestigationEngine):
+        self._text = RichOutput()
+        self._engine = engine
+        self._sd = None  # Lazy import of sounddevice
+        self._device_sr = None
+        self._audio_device = None
+
+        # Import voice dependencies (may raise ImportError)
+        from oracle.voice.tts import KokoroTTS
+        from oracle.voice.radio_fx import RadioFX, get_device_sample_rate, resample_for_device
+        from oracle.voice.audio_config import get_config
+
+        self._config = get_config()
+        self._audio_device = self._config.audio_device
+        self._tts = KokoroTTS()
+        self._radio = RadioFX()
+        self._resample = resample_for_device
+
+        # Query device sample rate once at startup
+        self._device_sr = get_device_sample_rate(self._audio_device)
+        if self._device_sr != self._config.sample_rate:
+            logger.info(
+                f"Device sample rate ({self._device_sr}Hz) differs from pipeline "
+                f"({self._config.sample_rate}Hz) — audio will be resampled."
+            )
+
+        try:
+            import sounddevice as sd
+            self._sd = sd
+        except ImportError:
+            logger.warning("sounddevice not available — voice output disabled")
+
+    def show_response(self, text: str) -> None:
+        """Speak the response through radio FX, then display as text."""
+        if self._sd is not None:
+            try:
+                candidate_count = len(self._engine.candidates)
+                audio, sr = self._tts.synthesize(text)
+                processed = self._radio.apply(audio, sr, candidate_count)
+
+                # Resample to device rate if needed (prevents paInvalidSampleRate)
+                if self._device_sr and self._device_sr != sr:
+                    processed = self._resample(processed, sr, self._device_sr)
+                    sr = self._device_sr
+
+                # Stop any currently playing audio to prevent overlap
+                self._sd.stop()
+                # Non-blocking: safe in Sprint 3b (no InputStream).
+                # Sprint 3c: switch to blocking=True when InputStream is added.
+                device_kwargs = {"device": self._audio_device} if self._audio_device else {}
+                self._sd.play(processed, sr, **device_kwargs)
+            except Exception as e:
+                logger.warning(f"Audio playback failed, falling back to text: {e}")
+
+        self._text.show_response(text)
+
+    def show_state(self, engine: InvestigationEngine) -> None:
+        self._text.show_state(engine)
+
+    def show_welcome(self) -> None:
+        self._text.show_welcome()
+        self._text._show_voice_table(self._tts.voice)
+
 
 # ── Dispatch ────────────────────────────────────────────────────────────────
 
@@ -172,7 +282,10 @@ def _dispatch(engine: InvestigationEngine, intent: ParsedIntent):
         return engine.register_players(intent.player_names)
 
     if action == "query_tests":
-        return engine.ghost_test_lookup(intent.ghost_name or "")
+        if intent.ghost_name:
+            return engine.ghost_test_lookup(intent.ghost_name)
+        # No specific ghost — list available tests among remaining candidates
+        return engine.available_tests()
 
     if action == "ghost_test_result":
         passed = intent.status == "passed"
@@ -183,6 +296,15 @@ def _dispatch(engine: InvestigationEngine, intent: ParsedIntent):
         if intent.ghost_name:
             return engine.query_ghost(intent.ghost_name)
         return UnknownCommandResult(raw_text=intent.raw_text)
+
+    if action == "change_voice":
+        from oracle.voice.audio_config import ALL_VOICES
+        voice = intent.voice_name or ""
+        return VoiceChangeResult(
+            voice_name=voice,
+            success=voice in ALL_VOICES,
+            available_voices=sorted(ALL_VOICES.keys()),
+        )
 
     # Unknown / null / unrecognized
     return UnknownCommandResult(raw_text=intent.raw_text)
@@ -210,6 +332,12 @@ def run_loop(
 
         intent = parse_intent(text)
         result = _dispatch(engine, intent)
+
+        # Handle voice change — apply to VoiceOutput's TTS if available
+        if isinstance(result, VoiceChangeResult) and result.success:
+            if isinstance(output, VoiceOutput):
+                output._tts.set_voice(result.voice_name)
+
         response = build_response(result)
         output.show_response(response)
 
@@ -225,7 +353,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Oracle — Phasmophobia Ghost ID Assistant")
     parser.add_argument(
         "--text", action="store_true", default=True,
-        help="Run in text mode (default, voice mode coming in Sprint 3b)",
+        help="Run in text mode (default)",
+    )
+    parser.add_argument(
+        "--speak", action="store_true", default=False,
+        help="Enable voice output with CB radio FX (requires --text, voice deps)",
     )
     parser.add_argument(
         "--difficulty",
@@ -235,6 +367,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # --speak without --text is invalid (STT not available until Sprint 3c)
+    if args.speak and not args.text:
+        print(
+            "Error: --speak requires --text (voice input not available until Sprint 3c).\n"
+            "Usage: oracle --text --speak",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     engine = InvestigationEngine()
 
     if args.difficulty:
@@ -242,7 +383,25 @@ def main() -> None:
         print(f"Auto-started: {result.difficulty} difficulty, {result.candidate_count} ghosts.")
 
     input_provider = TextInput()
-    output = RichOutput()
+
+    if args.speak:
+        try:
+            output: OutputHandler = VoiceOutput(engine)
+            print("Voice output enabled — Oracle will speak through your speakers.")
+        except ImportError as e:
+            print(
+                f"Voice dependencies not installed: {e}\n"
+                "Install with: pip install -e '.[voice]'",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        except Exception as e:
+            print(f"Voice output initialization failed: {e}", file=sys.stderr)
+            print("Falling back to text-only mode.")
+            output = RichOutput()
+    else:
+        output = RichOutput()
+
     run_loop(engine, input_provider, output)
 
 

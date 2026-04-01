@@ -132,7 +132,7 @@ class TestGhostQueryResponse:
             all_ghost_names=["Wraith", "Spirit"],
         )
         response = build_response(result)
-        assert "not found" in response.lower()
+        assert "casper" in response.lower()
 
     def test_found_includes_ghost_name(self):
         result = GhostQueryResult(

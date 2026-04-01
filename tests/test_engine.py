@@ -152,27 +152,55 @@ class TestRecordEvidence:
             assert result.identification_triggered is True
             assert result.identified_ghost is not None
 
-    def test_mimic_detection_orb_with_multiple_candidates(self, engine):
-        """Confirming orb while Mimic + others remain triggers mimic_detected."""
-        # Confirm just enough evidence that Mimic remains alongside others
-        engine.record_evidence("uv", "confirmed")
-        engine.record_evidence("freezing", "confirmed")
-        # Now confirm orb — Mimic should still be one of multiple candidates
-        result = engine.record_evidence("orb", "confirmed")
-        # mimic_detected fires when orb confirmed + Mimic in candidates + >1 candidate
-        if "The Mimic" in result.candidates and result.remaining_count > 1:
-            assert result.mimic_detected is True
+    def test_mimic_not_detected_below_threshold(self, engine):
+        """Confirming orb below evidence threshold should NOT trigger mimic_detected.
 
-    def test_mimic_four_evidence_identifies_mimic(self, engine):
-        """3 real Mimic evidence + orb narrows to Mimic alone (identification, not mimic_detected)."""
+        Regression: previously, confirming orbs as the 1st evidence on a fresh
+        game would trigger "Four pieces of evidence with orbs — that's a Mimic"
+        because _check_mimic only checked orbs+candidate, not evidence count.
+        """
+        # Just orb as first evidence — should NOT trigger Mimic detection
+        result = engine.record_evidence("orb", "confirmed")
+        assert result.mimic_detected is False
+
+        # Two evidence including orb — still below Professional threshold of 3
+        engine.record_evidence("uv", "confirmed")
+        result = engine.record_evidence("freezing", "confirmed")
+        assert result.mimic_detected is False
+
+    def test_mimic_detection_above_threshold(self, engine):
+        """Mimic detected when evidence count exceeds threshold AND orbs confirmed.
+
+        On Professional (threshold=3), need 4 confirmed evidence including orb.
+        """
         engine.record_evidence("uv", "confirmed")
         engine.record_evidence("freezing", "confirmed")
         engine.record_evidence("spirit_box", "confirmed")
+        # 4th evidence is orb — exceeds threshold, triggers Mimic detection
         result = engine.record_evidence("orb", "confirmed")
-        # With all 4, Mimic is the only candidate — triggers identification, not mimic_detected
+        # With all 4 Mimic evidence, it narrows to Mimic alone
         assert result.remaining_count == 1
         assert result.candidates == ["The Mimic"]
         assert result.identification_triggered is True
+
+    def test_mimic_regression_new_game_resets(self, engine):
+        """Starting a new game must fully reset state so Mimic detection is clean.
+
+        Regression: after a 3-evidence game, starting a new game and confirming
+        orbs as the 1st evidence should NOT trigger Mimic detection.
+        """
+        # First game: confirm 3 evidence
+        engine.record_evidence("emf_5", "confirmed")
+        engine.record_evidence("uv", "confirmed")
+        engine.record_evidence("dots", "confirmed")
+
+        # Start new game
+        engine.new_game("nightmare")
+
+        # First evidence in new game is orbs — must NOT trigger Mimic
+        result = engine.record_evidence("orb", "confirmed")
+        assert result.mimic_detected is False
+        assert len(engine.evidence_confirmed) == 1
 
     def test_over_proofed_four_evidence_without_orb(self, engine):
         """4 confirmed without orb on professional = over_proofed."""

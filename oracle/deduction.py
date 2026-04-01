@@ -83,31 +83,16 @@ def narrow_candidates(
             continue
 
         # --- Confirmed check ---
-        # A ghost must have all confirmed evidence in its observable set
-        # (real evidence + fake evidence). This means confirming Ghost Orbs
-        # does NOT eliminate the Mimic, because orbs are in its observable set.
-        if not permissive:
-            # Standard mode: ghost must have ALL confirmed evidence
-            for e in confirmed:
-                if e not in observable_set:
-                    skip = True
-                    break
-        else:
-            # Nightmare/Insanity: the difficulty hides some real evidence,
-            # but fake_evidence is NEVER hidden (Mimic always shows orbs).
-            # So we check against observable_set but only allow hiding from
-            # the real evidence_set.
-            missing = [e for e in confirmed if e not in observable_set]
-            # How many real evidence types could this ghost be hiding?
-            max_hidden = 1 if difficulty == "nightmare" else 2
-            if len(missing) > max_hidden:
+        # A ghost must have ALL confirmed evidence in its observable set
+        # (real evidence + fake evidence). This is strict on ALL difficulties.
+        #
+        # In Phasmophobia, Nightmare/Insanity hide evidence the ghost HAS
+        # from the player — they don't give ghosts evidence they don't have.
+        # So if the player confirmed evidence X, the ghost MUST have X.
+        for e in confirmed:
+            if e not in observable_set:
                 skip = True
-            else:
-                # Guaranteed evidence can never be hidden
-                for m in missing:
-                    if m in guaranteed_set:
-                        skip = True
-                        break
+                break
 
         if skip:
             continue
