@@ -129,10 +129,67 @@ BEHAVIORAL_PATTERNS: dict[str, re.Pattern] = {
         r"\b(?:changed?\s+(?:its\s+)?(?:favorite|fav(?:ourite)?)\s+room|moved?\s+rooms?)\b",
         re.IGNORECASE,
     ),
-    "ghost_stepped_in_salt": re.compile(
-        r"\b(?:salt|stepped\s+in\s+salt)\b", re.IGNORECASE
+    "ghost_turned_on_standard_light_switch": re.compile(
+        r"\b(?:turned?\s+(?:the\s+)?(?:light|lights)\s+on|(?:light|lights)\s+(?:turned|switched|flipped)\s+on)\b",
+        re.IGNORECASE,
+    ),
+    "dots_visible_with_naked_eye": re.compile(
+        r"\b(?:dots?\s+(?:with(?:out)?\s+)?(?:naked\s+)?eye|saw\s+dots?\s+(?:without|directly|with\s+(?:my|the)\s+(?:naked\s+)?eye))\b",
+        re.IGNORECASE,
+    ),
+    "ghost_hunted_from_same_room_as_player": re.compile(
+        r"\b(?:hunted?\s+from\s+(?:our|my|the\s+same)\s+room|ghost\s+hunted?\s+(?:in|from)\s+(?:our|the)\s+room)\b",
+        re.IGNORECASE,
     ),
 }
+
+# ── Soft fact patterns (record but don't auto-eliminate) ──────────────────
+
+SOFT_FACT_PATTERNS: dict[str, re.Pattern] = {
+    "banshee_scream": re.compile(
+        r"\b(?:banshee\s+scream|shriek|parabolic\s+(?:mic\s+)?shriek)\b",
+        re.IGNORECASE,
+    ),
+    "fusebox_emf": re.compile(
+        r"\b(?:(?:emf|reading)\s+(?:at|on|near)\s+(?:the\s+)?(?:fuse\s*box|breaker)|fuse\s*box\s+(?:emf|reading))\b",
+        re.IGNORECASE,
+    ),
+    "freezing_breath_during_hunt": re.compile(
+        r"\b(?:freezing\s+breath|breath\s+(?:during|in)\s+(?:a\s+)?hunt|visible\s+breath)\b",
+        re.IGNORECASE,
+    ),
+}
+
+# ── Behavior query patterns ───────────────────────────────────────────────
+
+BEHAVIOR_QUERY_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\b(?:what|which)\s+ghosts?\s+(?:can|will|would|could)\s+(\w+)\b", re.IGNORECASE),
+    re.compile(r"\b(?:it|ghost)\s+(\w+)(?:ed|s)?\s*[!.]", re.IGNORECASE),
+    re.compile(r"\b(?:can\s+(?:any|a)\s+ghost|which\s+ghost)\s+(\w+)\b", re.IGNORECASE),
+]
+
+# ── Test query patterns ──────────────────────────────────────────────────
+
+TEST_QUERY_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\bwhat\s+tests?\s+(?:can\s+(?:we|i)\s+(?:do|run|try|perform)|should\s+(?:we|i)\s+(?:do|try))\s+(?:for|on)\s+(?:the\s+)?(\w+)\b", re.IGNORECASE),
+    re.compile(r"\bhow\s+(?:do\s+(?:we|i)|can\s+(?:we|i)|to)\s+test\s+(?:for\s+)?(?:the\s+)?(\w+)\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+tests?\s+(?:should\s+(?:we|i)\s+(?:try|do|run)|can\s+(?:we|i)\s+(?:try|do|run))\b", re.IGNORECASE),
+]
+
+# ── Theory patterns ──────────────────────────────────────────────────────
+
+THEORY_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\b(\w+)\s+(?:thinks?|suspects?|believes?)\s+(?:it(?:'s|\s+is)\s+(?:a\s+)?)?(?:the\s+)?(\w+)\b", re.IGNORECASE),
+    re.compile(r"\b(?:i|my)\s+(?:think|suspect|believe)\s+(?:it(?:'s|\s+is)\s+(?:a\s+)?)?(?:the\s+)?(\w+)\b", re.IGNORECASE),
+    re.compile(r"\bmy\s+theory\s+is\s+(?:a\s+)?(?:the\s+)?(\w+)\b", re.IGNORECASE),
+]
+
+# ── Player patterns ──────────────────────────────────────────────────────
+
+PLAYER_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\b(?:add|register)\s+player\s+(\w+)\b", re.IGNORECASE),
+    re.compile(r"\b(?:register|add)\s+(\w+(?:\s+and\s+\w+)*)\s+(?:as\s+)?players?\b", re.IGNORECASE),
+]
 
 
 @dataclass
@@ -146,6 +203,8 @@ class ParsedIntent:
     query_field: str | None = None  # For query_ghost_database: specific field to look up
     observation: str | None = None
     eliminator_key: str | None = None
+    player_name: str | None = None
+    player_names: list[str] = field(default_factory=list)
     confidence: float = 1.0
     raw_text: str = ""
     extra_evidence: list[str] = field(default_factory=list)
@@ -216,7 +275,27 @@ def parse_intent(text: str) -> ParsedIntent:
                 raw_text=text,
             )
 
-    # 2. Evidence mention?
+    # 2. Soft fact + specific behavioral observations — checked BEFORE evidence
+    #    to prevent "freezing breath" matching as "freezing" evidence,
+    #    "EMF at fusebox" matching as "emf_5", or "DOTS with naked eye" as "dots".
+    #    These patterns are specific enough to not false-positive on real evidence inputs.
+    _EARLY_BEHAVIORAL = {**SOFT_FACT_PATTERNS}
+    # Also check behavioral patterns that contain evidence keywords
+    for key in ("dots_visible_with_naked_eye", "ghost_turned_on_standard_light_switch",
+                "ghost_hunted_from_same_room_as_player"):
+        if key in BEHAVIORAL_PATTERNS:
+            _EARLY_BEHAVIORAL[key] = BEHAVIORAL_PATTERNS[key]
+
+    for key, pattern in _EARLY_BEHAVIORAL.items():
+        if pattern.search(text):
+            return ParsedIntent(
+                action="record_behavioral_event",
+                observation=text,
+                eliminator_key=key,
+                raw_text=text,
+            )
+
+    # 2b. Evidence mention?
     evidence_found = _find_evidence(text)
     if evidence_found:
         is_confirm = _is_confirm(text)
@@ -242,7 +321,72 @@ def parse_intent(text: str) -> ParsedIntent:
             extra_evidence=evidence_found[1:],
         )
 
-    # 3. Advice / "what should we do next?"
+    # 3. Theory — "Kayden thinks it's a Poltergeist"
+    #    Must come before advice/state patterns to avoid matching "thinks" as a query
+    for pattern in THEORY_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            groups = m.groups()
+            if len(groups) == 2:
+                # Pattern 1: "X thinks it's Y"
+                player, ghost_raw = groups
+                ghost_name = _find_ghost_name(ghost_raw) or _find_ghost_name(text)
+                if ghost_name:
+                    # Normalize first-person pronouns to "me"
+                    player_clean = player.strip()
+                    if player_clean.lower() in ("i", "my", "me"):
+                        player_clean = "me"
+                    return ParsedIntent(
+                        action="record_theory",
+                        player_name=player_clean,
+                        ghost_name=ghost_name,
+                        raw_text=text,
+                    )
+            elif len(groups) == 1:
+                # Pattern 2/3: "I suspect Y" / "my theory is Y"
+                ghost_raw = groups[0]
+                ghost_name = _find_ghost_name(ghost_raw) or _find_ghost_name(text)
+                if ghost_name:
+                    return ParsedIntent(
+                        action="record_theory",
+                        player_name="me",
+                        ghost_name=ghost_name,
+                        raw_text=text,
+                    )
+
+    # 4. Player registration — "add player Kayden"
+    for pattern in PLAYER_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            raw = m.group(1)
+            names = [n.strip() for n in re.split(r"\s+and\s+|,\s*", raw) if n.strip()]
+            if names:
+                return ParsedIntent(
+                    action="register_players",
+                    player_names=names,
+                    raw_text=text,
+                )
+
+    # 5. Test query — "what tests for Goryo?" / "what tests should we try?"
+    for pattern in TEST_QUERY_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            groups = m.groups()
+            if groups and groups[0]:
+                ghost_name = _find_ghost_name(groups[0]) or _find_ghost_name(text)
+                if ghost_name:
+                    return ParsedIntent(
+                        action="query_tests",
+                        ghost_name=ghost_name,
+                        raw_text=text,
+                    )
+            # General test query — no specific ghost
+            return ParsedIntent(
+                action="query_tests",
+                raw_text=text,
+            )
+
+    # 6. Advice / "what should we do next?"
     for pattern in ADVICE_PATTERNS:
         if pattern.search(text):
             return ParsedIntent(
@@ -250,7 +394,7 @@ def parse_intent(text: str) -> ParsedIntent:
                 raw_text=text,
             )
 
-    # 4. Ghost evidence query — "what evidence does the Banshee have?"
+    # 7. Ghost evidence query — "what evidence does the Banshee have?"
     #    Must come BEFORE generic state queries because "what evidence does X have"
     #    contains "what...evidence" which would match state query patterns.
     for pattern in GHOST_EVIDENCE_QUERY_PATTERNS:
@@ -259,14 +403,16 @@ def parse_intent(text: str) -> ParsedIntent:
             raw_name = m.group(1)
             ghost_name = _find_ghost_name(raw_name) or _find_ghost_name(text)
             if ghost_name:
+                # Don't set query_field — let query_ghost_database return
+                # the full contextualized summary with CONFIRMED/untested
+                # markers and "Still need to test" breakdown.
                 return ParsedIntent(
                     action="query_ghost_database",
                     ghost_name=ghost_name,
-                    query_field="evidence",
                     raw_text=text,
                 )
 
-    # 5. State query?
+    # 8. State query?
     for pattern in STATE_PATTERNS:
         if pattern.search(text):
             return ParsedIntent(
@@ -274,7 +420,7 @@ def parse_intent(text: str) -> ParsedIntent:
                 raw_text=text,
             )
 
-    # 6. Behavioral observation?
+    # 9. Behavioral observation (with eliminator)?
     for key, pattern in BEHAVIORAL_PATTERNS.items():
         if pattern.search(text):
             return ParsedIntent(
@@ -284,7 +430,17 @@ def parse_intent(text: str) -> ParsedIntent:
                 raw_text=text,
             )
 
-    # 7. Ghost database query (generic)?
+    # 10. Behavior query — "what ghosts can shapeshift?"
+    for pattern in BEHAVIOR_QUERY_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            return ParsedIntent(
+                action="query_behavior",
+                observation=m.group(1) if m.groups() else text,
+                raw_text=text,
+            )
+
+    # 12. Ghost database query (generic)?
     ghost_name = _find_ghost_name(text)
     if ghost_name:
         return ParsedIntent(
@@ -293,7 +449,7 @@ def parse_intent(text: str) -> ParsedIntent:
             raw_text=text,
         )
 
-    # 6. No deterministic match — needs LLM
+    # 13. No deterministic match — needs LLM
     return ParsedIntent(
         action="llm_fallback",
         confidence=0.0,

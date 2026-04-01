@@ -131,6 +131,10 @@ ghosts:
       - "More likely to trigger singing ghost events"
       - "Hunt threshold is 50% of the TARGET's personal sanity — not party average"
 
+    soft_fact_eliminators:
+      model_gender:
+        eliminates_if: "male"
+
     community_tests:
       - name: "Target test"
         procedure: "Everyone stays inside. A suspected non-target holds incense visibly. If ghost walks straight past them during a hunt, it's hunting its true target — Banshee."
@@ -163,6 +167,10 @@ ghosts:
       - "Outside 10m: standard speed and threshold"
       - "LOS acceleration still builds outside range and applies when player re-enters the 10m bubble"
       - "One of the most dangerous ghosts when players are panicking and running"
+
+    soft_fact_eliminators:
+      model_gender:
+        eliminates_if: "male"
 
     community_tests:
       - name: "Freeze test"
@@ -317,6 +325,12 @@ ghosts:
       - "Never changes favorite room (aside from Monkey Paw interference)"
       - "Rarely roams far from its favorite room"
 
+    soft_fact_eliminators:
+      favorite_room_changed:
+        eliminates_if: true
+      dots_visible_naked_eye:
+        eliminates_if: true
+
     community_tests:
       - name: "Camera D.O.T.S. test"
         procedure: "Leave a camera recording the ghost room from outside. If D.O.T.S. appears on feed but never when you're physically watching, that's Goryo."
@@ -344,6 +358,10 @@ ghosts:
       twice_as_likely_to_turn_breaker_off: true
       no_los_speed_boost: true          # Does NOT speed up with line-of-sight
       freezing_breath_when_breaker_off: true  # CORRECTION: tied to breaker being off, not room temp
+
+    soft_fact_eliminators:
+      turned_on_breaker:
+        eliminates_if: true
 
     behavioral_tells:
       - "Speed is entirely temperature-driven: faster in cold rooms, slower in warm rooms"

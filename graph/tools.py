@@ -15,8 +15,11 @@ from .deduction import (
     apply_observation_eliminator,
     get_ghost,
     load_db,
+    EVIDENCE_THRESHOLDS,
+    evidence_threshold_reached,
 )
 from config.settings import config
+from .state import DEFAULT_SOFT_FACTS
 
 # ── Shared mutable state — bound before each graph invoke ────────────────────
 
@@ -89,6 +92,14 @@ def init_investigation(difficulty: str) -> str:
     _state["investigation_active"] = True
     _state["identified_ghost"] = None
     _state["true_ghost"] = None
+
+    # Sprint 2 fields
+    _state["investigation_phase"] = "evidence"
+    _state["soft_facts"] = dict(DEFAULT_SOFT_FACTS)
+    _state["players"] = []
+    _state["theories"] = {}
+    _state["prev_candidate_count"] = len(_state["candidates"])
+
     n = len(_state["candidates"])
     return f"New investigation started on {difficulty}. {n} ghost candidates active."
 
@@ -154,7 +165,12 @@ def record_evidence(evidence_id: str, status: str) -> str:
 
     # Difficulty-aware evidence threshold
     difficulty = _state.get("difficulty", "professional")
-    threshold = _EVIDENCE_THRESHOLDS.get(difficulty, 3)
+    threshold = EVIDENCE_THRESHOLDS.get(difficulty, 3)
+
+    # Phase rollback: if evidence was retracted below threshold, reset phase
+    if (_state.get("investigation_phase") == "behavioral"
+            and not evidence_threshold_reached(confirmed, difficulty)):
+        _state["investigation_phase"] = "evidence"
 
     # Over-proofed / threshold detection
     if status == "confirmed" and len(confirmed) > threshold:
@@ -323,16 +339,6 @@ def query_ghost_database(ghost_name: str, field: str = "") -> str:
     return "\n".join(lines)
 
 
-# ── Evidence threshold by difficulty ──────────────────────────────────────────
-
-_EVIDENCE_THRESHOLDS = {
-    "amateur": 3,
-    "intermediate": 3,
-    "professional": 3,
-    "nightmare": 2,
-    "insanity": 1,
-}
-
 # ── Evidence labels for human-readable output ────────────────────────────────
 
 _EVIDENCE_LABELS = {
@@ -358,7 +364,7 @@ def suggest_next_evidence() -> str:
     remaining = VALID_EVIDENCE - tested
 
     difficulty = _state.get("difficulty", "professional")
-    threshold = _EVIDENCE_THRESHOLDS.get(difficulty, 3)
+    threshold = EVIDENCE_THRESHOLDS.get(difficulty, 3)
     candidates = _state.get("candidates", [])
     n_confirmed = len(confirmed)
 
@@ -455,6 +461,93 @@ def confirm_true_ghost(ghost_name: str) -> str:
     return " ".join(parts)
 
 
+# ── Multi-beat response structure ─────────────────────────────────────────────
+
+from dataclasses import dataclass, field as dc_field
+
+
+@dataclass
+class ToolResultBeat:
+    """A single beat in a multi-part Oracle response."""
+    content: str
+    tone: str = "inform"  # "inform" | "warn" | "celebrate" | "suggest"
+
+
+@dataclass
+class StructuredToolResult:
+    """Multi-beat tool result. narrate_node handles each beat separately."""
+    beats: list[ToolResultBeat] = dc_field(default_factory=list)
+
+
+# ── Player registration + theory tools ───────────────────────────────────────
+
+@tool
+def register_players(player_names: str) -> str:
+    """Register one or more players for this investigation.
+    player_names: comma-separated names (e.g. 'Mike, Kayden')
+    """
+    names = [n.strip() for n in player_names.split(",") if n.strip()]
+    if not names:
+        return "No player names provided."
+
+    existing = _state.setdefault("players", [])
+    added = []
+    for name in names:
+        if name not in existing:
+            existing.append(name)
+            added.append(name)
+
+    # Initialize theories for new players
+    theories = _state.setdefault("theories", {})
+    for name in added:
+        if name not in theories:
+            theories[name] = None
+
+    if added:
+        return f"Registered player(s): {', '.join(added)}. {len(existing)} total."
+    return f"All players already registered. {len(existing)} total."
+
+
+@tool
+def record_theory(player_name: str, ghost_name: str) -> str:
+    """Log a player's theory about the ghost type.
+    player_name: who suspects this ghost
+    ghost_name: which ghost they suspect
+    """
+    ghost = get_ghost(ghost_name)
+    if not ghost:
+        all_names = [g["name"] for g in load_db()["ghosts"]]
+        return (
+            f"Ghost '{ghost_name}' not found. "
+            f"Known ghosts: {', '.join(all_names)}"
+        )
+
+    true_name = ghost["name"]
+    players = _state.setdefault("players", [])
+    theories = _state.setdefault("theories", {})
+
+    # Auto-register unknown players
+    if player_name not in players:
+        players.append(player_name)
+
+    old_theory = theories.get(player_name)
+    theories[player_name] = true_name
+
+    candidates = _state.get("candidates", [])
+    parts = [f"{player_name}'s theory: {true_name}."]
+
+    if old_theory and old_theory != true_name:
+        parts.append(f"(Previously suspected {old_theory}.)")
+
+    if true_name not in candidates:
+        parts.append(
+            f"Note: {true_name} has been eliminated based on current evidence. "
+            "Either the theory is wrong, or evidence was recorded incorrectly."
+        )
+
+    return " ".join(parts)
+
+
 ORACLE_TOOLS = [
     init_investigation,
     record_evidence,
@@ -463,4 +556,6 @@ ORACLE_TOOLS = [
     query_ghost_database,
     suggest_next_evidence,
     confirm_true_ghost,
+    register_players,
+    record_theory,
 ]

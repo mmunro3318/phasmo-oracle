@@ -267,3 +267,101 @@ class TestEdgeCases:
         assert intent.evidence_id in ("orb", "freezing")
         # Extra evidence should be noted for follow-up
         assert len(intent.extra_evidence) >= 1
+
+
+# ── Sprint 2: Theory patterns ───────────────────────────────────────────────
+
+class TestTheoryPatterns:
+    @pytest.mark.parametrize("text,expected_player,expected_ghost", [
+        ("Kayden thinks it's a Poltergeist", "Kayden", "Poltergeist"),
+        ("Mike suspects the Wraith", "Mike", "Wraith"),
+        ("Kayden believes it is a Banshee", "Kayden", "Banshee"),
+    ])
+    def test_named_player_theory(self, text, expected_player, expected_ghost):
+        intent = parse_intent(text)
+        assert intent.action == "record_theory"
+        assert intent.player_name == expected_player
+        assert intent.ghost_name == expected_ghost
+
+    @pytest.mark.parametrize("text,expected_ghost", [
+        ("I suspect Wraith", "Wraith"),
+        ("my theory is Banshee", "Banshee"),
+    ])
+    def test_self_theory(self, text, expected_ghost):
+        intent = parse_intent(text)
+        assert intent.action == "record_theory"
+        assert intent.player_name == "me"
+        assert intent.ghost_name == expected_ghost
+
+
+# ── Sprint 2: Player patterns ───────────────────────────────────────────────
+
+class TestPlayerPatterns:
+    def test_add_single_player(self):
+        intent = parse_intent("add player Kayden")
+        assert intent.action == "register_players"
+        assert "Kayden" in intent.player_names
+
+    def test_register_multiple_players(self):
+        intent = parse_intent("register Mike and Kayden as players")
+        assert intent.action == "register_players"
+        assert "Mike" in intent.player_names
+        assert "Kayden" in intent.player_names
+
+
+# ── Sprint 2: Test query patterns ───────────────────────────────────────────
+
+class TestTestQueryPatterns:
+    def test_tests_for_specific_ghost(self):
+        intent = parse_intent("what tests can we do for Goryo?")
+        assert intent.action == "query_tests"
+        assert intent.ghost_name == "Goryo"
+
+    def test_how_to_test_for_ghost(self):
+        intent = parse_intent("how do we test for Banshee?")
+        assert intent.action == "query_tests"
+        assert intent.ghost_name == "Banshee"
+
+    def test_general_test_query(self):
+        intent = parse_intent("what tests should we try?")
+        assert intent.action == "query_tests"
+
+
+# ── Sprint 2: Soft fact patterns ────────────────────────────────────────────
+
+class TestSoftFactPatterns:
+    def test_freezing_breath(self):
+        intent = parse_intent("I saw freezing breath during the hunt")
+        assert intent.action == "record_behavioral_event"
+        assert intent.eliminator_key == "freezing_breath_during_hunt"
+
+    def test_fusebox_emf(self):
+        intent = parse_intent("there was an EMF reading at the fusebox")
+        assert intent.action == "record_behavioral_event"
+        assert intent.eliminator_key == "fusebox_emf"
+
+    def test_dots_naked_eye(self):
+        intent = parse_intent("saw DOTS with the naked eye")
+        assert intent.action == "record_behavioral_event"
+        assert intent.eliminator_key == "dots_visible_with_naked_eye"
+
+    def test_ghost_hunted_from_room(self):
+        intent = parse_intent("the ghost hunted from our room")
+        assert intent.action == "record_behavioral_event"
+        assert intent.eliminator_key == "ghost_hunted_from_same_room_as_player"
+
+    def test_light_switch(self):
+        intent = parse_intent("ghost turned the lights on")
+        assert intent.action == "record_behavioral_event"
+        assert intent.eliminator_key == "ghost_turned_on_standard_light_switch"
+
+
+# ── Sprint 2: Ghost evidence query fix ──────────────────────────────────────
+
+class TestGhostEvidenceQueryFix:
+    def test_no_query_field_set(self):
+        """Evidence queries should NOT set query_field — use full summary."""
+        intent = parse_intent("what evidence does the Moroi need?")
+        assert intent.action == "query_ghost_database"
+        assert intent.ghost_name == "Moroi"
+        assert intent.query_field is None  # Bug fix: was "evidence"

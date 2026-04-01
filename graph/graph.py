@@ -1,13 +1,16 @@
-"""StateGraph assembly — two-stage Oracle agent graph.
+"""StateGraph assembly — Sprint 2 Oracle agent graph.
 
-Topology:
-    parse_intent ──[deterministic match]──▶ execute_tool ──▶ narrate ──▶ END
-         │
-         └──[llm_fallback]──▶ llm_classify ──▶ execute_tool ──▶ narrate ──▶ END
+Topology (Sprint 2):
+    parse_intent ──[match]──▶ execute_tool ──▶ route_after_tools
+         │                                        ├──[identify]──▶ identify ──▶ narrate ──▶ END
+         │                                        ├──[phase_shift]──▶ phase_shift ──▶ narrate ──▶ END
+         │                                        ├──[comment]──▶ commentary ──▶ END
+         │                                        └──[normal]──▶ narrate ──▶ END
+         └──[fallback]──▶ llm_classify ──▶ execute_tool ──▶ route_after_tools ──▶ ...
 
 ~85% of inputs are handled by the deterministic parser (instant, no LLM).
-The LLM is only called for the narrator (persona response) and ambiguous
-inputs that the parser can't classify.
+The LLM is called for: narrator (persona response), ambiguous input classification,
+and commentary when candidates narrow.
 """
 from __future__ import annotations
 
@@ -19,6 +22,10 @@ from .nodes import (
     execute_tool_node,
     narrate_node,
     route_after_parse,
+    route_after_tools,
+    identify_node,
+    phase_shift_node,
+    commentary_node,
 )
 
 
@@ -30,6 +37,9 @@ def build_graph():
     builder.add_node("llm_classify", llm_classify_node)
     builder.add_node("execute_tool", execute_tool_node)
     builder.add_node("narrate", narrate_node)
+    builder.add_node("identify", identify_node)
+    builder.add_node("phase_shift", phase_shift_node)
+    builder.add_node("commentary", commentary_node)
 
     # Entry: always start with deterministic parsing
     builder.add_edge(START, "parse_intent")
@@ -44,8 +54,24 @@ def build_graph():
     # LLM classifier feeds into tool execution
     builder.add_edge("llm_classify", "execute_tool")
 
-    # Tool execution feeds into narrator
-    builder.add_edge("execute_tool", "narrate")
+    # After tool execution: conditional routing
+    builder.add_conditional_edges(
+        "execute_tool",
+        route_after_tools,
+        {
+            "identify": "identify",
+            "phase_shift": "phase_shift",
+            "comment": "commentary",
+            "normal": "narrate",
+        },
+    )
+
+    # identify and phase_shift feed into narrator for personality
+    builder.add_edge("identify", "narrate")
+    builder.add_edge("phase_shift", "narrate")
+
+    # commentary generates its own response — goes straight to END
+    builder.add_edge("commentary", END)
 
     # Narrator is terminal
     builder.add_edge("narrate", END)

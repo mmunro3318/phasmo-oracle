@@ -24,6 +24,16 @@ from .tools import (
     query_ghost_database,
     suggest_next_evidence,
     confirm_true_ghost,
+    register_players,
+    record_theory,
+    StructuredToolResult,
+)
+from .deduction import (
+    eliminate_by_guaranteed_evidence,
+    evidence_threshold_reached,
+    rank_discriminating_tests,
+    get_ghost,
+    load_db,
 )
 
 logger = logging.getLogger("oracle.nodes")
@@ -32,12 +42,18 @@ logger = logging.getLogger("oracle.nodes")
 
 _NARRATOR_PROMPT = """\
 You are Oracle — a sardonic, bone-dry British advisor who takes ghost identification \
-seriously but finds the players' panic mildly amusing. Your tone is professional \
-with an undercurrent of quiet exasperation. You never break character.
+seriously but finds the players' panic mildly amusing. Think dry BBC presenter \
+meets reluctant paranormal consultant. You've seen too many amateurs scream at EMF \
+readers to be impressed, but you do appreciate competent fieldwork.
 
 Given the tool result below, write EXACTLY 1-2 sentences summarizing what happened \
 or answering the player's question. Never exceed 2 sentences. Never invent information \
 not present in the tool result. Stay in character.
+
+Examples of your tone:
+- "Spirit Box confirmed. Marvellous — now we're getting somewhere. That narrows things considerably."
+- "No freezing temperatures. Cross that off the list, then, and do try not to touch the thermometer with your warm fingers next time."
+- "Three candidates remain, and I assure you none of them are friendly."
 
 Tool result:
 {tool_result}"""
@@ -171,6 +187,76 @@ def execute_tool_node(state: OracleState) -> dict:
                 "observation": intent.get("observation", ""),
                 "eliminator_key": intent.get("eliminator_key", ""),
             })
+        elif action == "register_players":
+            names = intent.get("player_names", [])
+            result = register_players.invoke({
+                "player_names": ", ".join(names) if isinstance(names, list) else str(names),
+            })
+        elif action == "record_theory":
+            result = record_theory.invoke({
+                "player_name": intent.get("player_name", ""),
+                "ghost_name": intent.get("ghost_name", ""),
+            })
+        elif action == "query_tests":
+            ghost_name = intent.get("ghost_name")
+            if ghost_name:
+                ghost = get_ghost(ghost_name)
+                if ghost:
+                    tests = ghost.get("community_tests", [])
+                    if tests:
+                        lines = [f"Tests for {ghost['name']}:"]
+                        for t in tests:
+                            lines.append(f"- {t.get('name', 'unnamed')}: {t.get('procedure', '')}")
+                            if t.get("confidence"):
+                                lines[-1] += f" (confidence: {t['confidence']})"
+                        result = "\n".join(lines)
+                    else:
+                        result = (
+                            f"No known community tests for {ghost['name']}. "
+                            "Try checking behavioral tells instead."
+                        )
+                else:
+                    result = f"Ghost '{ghost_name}' not found."
+            else:
+                # General test query — suggest discriminating tests
+                candidates = state.get("candidates", [])
+                ranked = rank_discriminating_tests(candidates)
+                if ranked:
+                    lines = ["Discriminating tests for remaining candidates:"]
+                    for rt in ranked[:5]:  # Top 5
+                        lines.append(
+                            f"- [{rt.ghost_name}] {rt.test_name}: {rt.procedure}"
+                        )
+                    result = "\n".join(lines)
+                else:
+                    result = "No discriminating tests available for current candidates."
+        elif action == "query_behavior":
+            # Search behavioral profiles for a keyword
+            keyword = intent.get("observation", "").lower()
+            db = load_db()
+            matches = []
+            for g in db["ghosts"]:
+                tells = g.get("behavioral_tells", [])
+                flags = g.get("hard_flags", {})
+                for tell in tells:
+                    if keyword in tell.lower():
+                        matches.append(f"{g['name']}: {tell}")
+                for flag_key, flag_val in flags.items():
+                    if keyword in flag_key.lower():
+                        matches.append(f"{g['name']}: {flag_key} = {flag_val}")
+
+            candidates = state.get("candidates", [])
+            if matches:
+                lines = [f"Ghosts with behavior matching '{keyword}':"]
+                for m in matches:
+                    ghost_name_part = m.split(":")[0]
+                    status_tag = ""
+                    if ghost_name_part not in candidates:
+                        status_tag = " [ELIMINATED]"
+                    lines.append(f"- {m}{status_tag}")
+                result = "\n".join(lines)
+            else:
+                result = f"No ghost behaviors found matching '{keyword}'."
         elif action == "direct_response":
             # No tool to call — the narrator will generate a response from state
             return {"tool_result": f"Player asked: {intent.get('raw_text', state.get('user_text', ''))}"}
@@ -187,8 +273,33 @@ def execute_tool_node(state: OracleState) -> dict:
 
 # ── Node: LLM narrator ──────────────────────────────────────────────────────
 
+def _narrate_single_beat(tool_result: str, tone: str = "inform") -> str:
+    """Narrate a single beat of a tool result with the Oracle persona."""
+    from .llm import get_llm
+    llm = get_llm()
+
+    tone_directive = ""
+    if tone == "warn":
+        tone_directive = "\nTone: deliver this as a warning — something the player should be concerned about."
+    elif tone == "celebrate":
+        tone_directive = "\nTone: deliver this with satisfaction — a successful deduction."
+    elif tone == "suggest":
+        tone_directive = "\nTone: deliver this as a suggestion — guiding the player's next move."
+
+    messages = [
+        SystemMessage(content=_NARRATOR_PROMPT.format(tool_result=tool_result) + tone_directive),
+        HumanMessage(content="Write Oracle's response."),
+    ]
+    response = llm.invoke(messages)
+    return response.content.strip()
+
+
 def narrate_node(state: OracleState) -> dict:
-    """Generate Oracle's persona response from the tool result."""
+    """Generate Oracle's persona response from the tool result.
+
+    Handles both plain string results (single narration call) and
+    StructuredToolResult (beat-by-beat narration, capped at 2 in text mode).
+    """
     tool_result = state.get("tool_result")
 
     if not tool_result:
@@ -211,15 +322,150 @@ def narrate_node(state: OracleState) -> dict:
             return {"oracle_response": None}
         return {"oracle_response": content}
 
-    # For tool results, narrate them with personality
-    from .llm import get_llm
-    llm = get_llm()
-    messages = [
-        SystemMessage(content=_NARRATOR_PROMPT.format(tool_result=tool_result)),
-        HumanMessage(content="Write Oracle's response."),
-    ]
-    response = llm.invoke(messages)
-    return {"oracle_response": response.content.strip()}
+    # Handle StructuredToolResult (multi-beat)
+    if isinstance(tool_result, StructuredToolResult):
+        beats = tool_result.beats[:2]  # Cap at 2 beats in text mode
+        narrated_parts = []
+        for beat in beats:
+            try:
+                narrated = _narrate_single_beat(beat.content, beat.tone)
+                narrated_parts.append(narrated)
+            except Exception as exc:
+                logger.error("Beat narration failed: %s", exc)
+                # Return what we have so far
+                break
+        return {"oracle_response": "\n\n".join(narrated_parts) if narrated_parts else None}
+
+    # For plain string tool results, narrate with personality
+    narrated = _narrate_single_beat(str(tool_result))
+    return {"oracle_response": narrated}
+
+
+# ── Sprint 2: Post-tool conditional routing ─────────────────────────────────
+
+def route_after_tools(state: OracleState) -> str:
+    """Route after tool execution based on investigation state.
+
+    Priority order:
+    1. identify — 1 candidate + threshold reached + not yet identified
+    2. phase_shift — threshold reached + >1 candidates + still in evidence phase
+    3. comment — candidates changed this turn + 1 < n <= 5
+    4. normal — everything else
+    """
+    candidates = state.get("candidates", [])
+    confirmed = state.get("evidence_confirmed", [])
+    difficulty = state.get("difficulty", "professional")
+    n = len(candidates)
+
+    threshold_met = evidence_threshold_reached(confirmed, difficulty)
+
+    # Guard: already identified → normal
+    if state.get("identified_ghost") is not None:
+        return "normal"
+
+    # 1. Identification
+    if n == 1 and threshold_met:
+        return "identify"
+
+    # 2. Phase shift (only fires once — from evidence → behavioral)
+    if (threshold_met
+            and n > 1
+            and state.get("investigation_phase") == "evidence"):
+        return "phase_shift"
+
+    # 3. Commentary on narrowed candidates
+    prev_count = state.get("prev_candidate_count", 27)
+    if n != prev_count and 1 < n <= 5:
+        return "comment"
+
+    return "normal"
+
+
+def identify_node(state: OracleState) -> dict:
+    """Announce ghost identification when 1 candidate remains."""
+    candidates = state.get("candidates", [])
+    if not candidates or state.get("identified_ghost") is not None:
+        return {"tool_result": state.get("tool_result", "")}
+
+    ghost_name = candidates[0]
+    return {
+        "identified_ghost": ghost_name,
+        "tool_result": (
+            f"IDENTIFICATION: The ghost is {ghost_name}. "
+            "Lock it in on the whiteboard and get back to the truck."
+        ),
+    }
+
+
+def phase_shift_node(state: OracleState) -> dict:
+    """Run guaranteed evidence elimination and transition to behavioral phase."""
+    candidates = list(state.get("candidates", []))
+    confirmed = state.get("evidence_confirmed", [])
+    difficulty = state.get("difficulty", "professional")
+
+    # Run guaranteed evidence elimination
+    remaining = eliminate_by_guaranteed_evidence(candidates, confirmed, difficulty)
+    eliminated_by_ge = [c for c in candidates if c not in remaining]
+
+    parts = []
+    if eliminated_by_ge:
+        parts.append(
+            f"Eliminated {len(eliminated_by_ge)} ghost(s) missing guaranteed evidence: "
+            f"{', '.join(eliminated_by_ge)}."
+        )
+
+    parts.append(
+        f"That's all the hard evidence we're going to get on {difficulty}. "
+        f"Remaining candidates ({len(remaining)}): {', '.join(remaining)}."
+    )
+
+    if remaining:
+        parts.append("Let me suggest some behavioral tests to narrow it down further.")
+
+    result = {
+        "investigation_phase": "behavioral",
+        "candidates": remaining,
+        "tool_result": " ".join(parts),
+    }
+
+    # If guaranteed evidence elimination narrowed to 1, identify immediately
+    if len(remaining) == 1:
+        result["identified_ghost"] = remaining[0]
+        result["tool_result"] += (
+            f" IDENTIFICATION: The ghost is {remaining[0]}."
+        )
+
+    return result
+
+
+def commentary_node(state: OracleState) -> dict:
+    """Generate LLM commentary when candidates narrow to 5 or fewer."""
+    candidates = state.get("candidates", [])
+    tool_result = state.get("tool_result", "")
+    n = len(candidates)
+
+    commentary_context = (
+        f"The candidate list just narrowed to {n}: {', '.join(candidates)}. "
+        f"Previous tool result: {tool_result}"
+    )
+
+    try:
+        from .llm import get_llm
+        llm = get_llm()
+        messages = [
+            SystemMessage(content=(
+                "You are Oracle — a sardonic, bone-dry British advisor for Phasmophobia. "
+                "The candidate list just narrowed. Write EXACTLY 2 sentences: "
+                "acknowledge the narrowing and suggest what to focus on next. "
+                "Be specific about the remaining ghosts. Stay in character."
+            )),
+            HumanMessage(content=commentary_context),
+        ]
+        response = llm.invoke(messages)
+        return {"oracle_response": response.content.strip()}
+    except Exception as exc:
+        logger.error("Commentary LLM failed: %s", exc)
+        return {"oracle_response": f"Narrowed to {n} candidates: {', '.join(candidates)}."}
 
 
 # ── Routing function ─────────────────────────────────────────────────────────

@@ -11,11 +11,15 @@ from graph.tools import (
     record_behavioral_event,
     get_investigation_state,
     query_ghost_database,
+    register_players,
+    record_theory,
+    suggest_next_evidence,
     VALID_EVIDENCE,
     normalize_evidence_id,
     _state,
 )
 from graph.deduction import all_ghost_names
+from graph.state import DEFAULT_SOFT_FACTS
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -417,3 +421,135 @@ class TestNormalizeEvidenceId:
 
     def test_unknown_passes_through(self):
         assert normalize_evidence_id("banana") == "banana"
+
+
+# ── Sprint 2: init_investigation resets new fields ────────────────────────
+
+
+class TestInitInvestigationSprint2:
+    def test_resets_investigation_phase(self):
+        _state["investigation_phase"] = "behavioral"
+        init_investigation.invoke({"difficulty": "professional"})
+        assert _state["investigation_phase"] == "evidence"
+
+    def test_resets_soft_facts(self):
+        _state["soft_facts"] = {"model_gender": "male"}
+        init_investigation.invoke({"difficulty": "professional"})
+        assert _state["soft_facts"] == DEFAULT_SOFT_FACTS
+
+    def test_resets_players(self):
+        _state["players"] = ["Mike"]
+        init_investigation.invoke({"difficulty": "professional"})
+        assert _state["players"] == []
+
+    def test_resets_theories(self):
+        _state["theories"] = {"Mike": "Wraith"}
+        init_investigation.invoke({"difficulty": "professional"})
+        assert _state["theories"] == {}
+
+    def test_resets_prev_candidate_count(self):
+        _state["prev_candidate_count"] = 5
+        init_investigation.invoke({"difficulty": "professional"})
+        assert _state["prev_candidate_count"] == 27
+
+
+# ── Sprint 2: register_players ───────────────────────────────────────────
+
+
+class TestRegisterPlayers:
+    def test_register_single_player(self):
+        init_investigation.invoke({"difficulty": "professional"})
+        result = register_players.invoke({"player_names": "Mike"})
+        assert "Mike" in _state["players"]
+        assert "Mike" in _state["theories"]
+        assert _state["theories"]["Mike"] is None
+
+    def test_register_multiple_players(self):
+        init_investigation.invoke({"difficulty": "professional"})
+        result = register_players.invoke({"player_names": "Mike, Kayden"})
+        assert "Mike" in _state["players"]
+        assert "Kayden" in _state["players"]
+        assert len(_state["players"]) == 2
+
+    def test_duplicate_player_ignored(self):
+        init_investigation.invoke({"difficulty": "professional"})
+        register_players.invoke({"player_names": "Mike"})
+        register_players.invoke({"player_names": "Mike"})
+        assert _state["players"].count("Mike") == 1
+
+    def test_empty_input(self):
+        init_investigation.invoke({"difficulty": "professional"})
+        result = register_players.invoke({"player_names": ""})
+        assert "No player names" in result
+
+
+# ── Sprint 2: record_theory ──────────────────────────────────────────────
+
+
+class TestRecordTheory:
+    def test_known_player_valid_ghost(self):
+        init_investigation.invoke({"difficulty": "professional"})
+        register_players.invoke({"player_names": "Mike"})
+        result = record_theory.invoke(
+            {"player_name": "Mike", "ghost_name": "Wraith"}
+        )
+        assert _state["theories"]["Mike"] == "Wraith"
+        assert "Mike" in result
+
+    def test_unknown_player_auto_registers(self):
+        init_investigation.invoke({"difficulty": "professional"})
+        result = record_theory.invoke(
+            {"player_name": "Kayden", "ghost_name": "Poltergeist"}
+        )
+        assert "Kayden" in _state["players"]
+        assert _state["theories"]["Kayden"] == "Poltergeist"
+
+    def test_invalid_ghost_returns_error(self):
+        init_investigation.invoke({"difficulty": "professional"})
+        result = record_theory.invoke(
+            {"player_name": "Mike", "ghost_name": "Casper"}
+        )
+        assert "not found" in result
+
+    def test_overwrite_existing_theory(self):
+        init_investigation.invoke({"difficulty": "professional"})
+        record_theory.invoke({"player_name": "Mike", "ghost_name": "Wraith"})
+        result = record_theory.invoke(
+            {"player_name": "Mike", "ghost_name": "Spirit"}
+        )
+        assert _state["theories"]["Mike"] == "Spirit"
+        assert "Previously" in result
+
+    def test_theory_for_eliminated_ghost_warns(self):
+        init_investigation.invoke({"difficulty": "professional"})
+        # Rule out UV to eliminate Wraith
+        record_evidence.invoke({"evidence_id": "dots", "status": "ruled_out"})
+        result = record_theory.invoke(
+            {"player_name": "Mike", "ghost_name": "Wraith"}
+        )
+        assert "eliminated" in result.lower()
+
+
+# ── Sprint 2: phase rollback ─────────────────────────────────────────────
+
+
+class TestPhaseRollback:
+    def test_retracting_evidence_resets_phase(self):
+        init_investigation.invoke({"difficulty": "nightmare"})
+        # Confirm 2 evidence (meets nightmare threshold)
+        record_evidence.invoke({"evidence_id": "emf_5", "status": "confirmed"})
+        record_evidence.invoke({"evidence_id": "dots", "status": "confirmed"})
+        # Manually set phase to behavioral (simulating phase_shift)
+        _state["investigation_phase"] = "behavioral"
+        # Retract one evidence — drops below threshold
+        record_evidence.invoke({"evidence_id": "dots", "status": "ruled_out"})
+        assert _state["investigation_phase"] == "evidence"
+
+    def test_phase_stays_behavioral_if_still_at_threshold(self):
+        init_investigation.invoke({"difficulty": "nightmare"})
+        record_evidence.invoke({"evidence_id": "emf_5", "status": "confirmed"})
+        record_evidence.invoke({"evidence_id": "dots", "status": "confirmed"})
+        _state["investigation_phase"] = "behavioral"
+        # Confirm another evidence — still above threshold
+        record_evidence.invoke({"evidence_id": "uv", "status": "confirmed"})
+        assert _state["investigation_phase"] == "behavioral"

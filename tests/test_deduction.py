@@ -416,3 +416,171 @@ def test_nightmare_does_not_hide_guaranteed_evidence():
 
     # But Deogen (dots, writing, spirit_box) has both — should survive.
     assert "Deogen" in candidates
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2: evidence_threshold_reached
+# ---------------------------------------------------------------------------
+
+class TestEvidenceThresholdReached:
+
+    def test_threshold_met_exactly(self):
+        from graph.deduction import evidence_threshold_reached
+        assert evidence_threshold_reached(["emf_5", "dots", "uv"], "professional") is True
+
+    def test_threshold_exceeded(self):
+        from graph.deduction import evidence_threshold_reached
+        assert evidence_threshold_reached(["a", "b", "c", "d"], "professional") is True
+
+    def test_threshold_not_met(self):
+        from graph.deduction import evidence_threshold_reached
+        assert evidence_threshold_reached(["emf_5"], "professional") is False
+
+    def test_nightmare_threshold_two(self):
+        from graph.deduction import evidence_threshold_reached
+        assert evidence_threshold_reached(["emf_5", "dots"], "nightmare") is True
+        assert evidence_threshold_reached(["emf_5"], "nightmare") is False
+
+    def test_insanity_threshold_one(self):
+        from graph.deduction import evidence_threshold_reached
+        assert evidence_threshold_reached(["emf_5"], "insanity") is True
+        assert evidence_threshold_reached([], "insanity") is False
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2: eliminate_by_guaranteed_evidence
+# ---------------------------------------------------------------------------
+
+class TestEliminateByGuaranteedEvidence:
+    from graph.deduction import eliminate_by_guaranteed_evidence
+
+    def test_professional_returns_unchanged(self):
+        from graph.deduction import eliminate_by_guaranteed_evidence
+        candidates = ["Goryo", "Hantu", "Moroi"]
+        result = eliminate_by_guaranteed_evidence(candidates, ["emf_5"], "professional")
+        assert result == candidates
+
+    def test_nightmare_keeps_ghost_with_confirmed_guaranteed(self):
+        from graph.deduction import eliminate_by_guaranteed_evidence
+        # Goryo guaranteed=dots, Hantu guaranteed=freezing
+        result = eliminate_by_guaranteed_evidence(
+            ["Goryo", "Hantu"], ["dots"], "nightmare"
+        )
+        assert "Goryo" in result
+        assert "Hantu" not in result  # freezing not confirmed
+
+    def test_nightmare_keeps_ghost_without_guaranteed(self):
+        from graph.deduction import eliminate_by_guaranteed_evidence
+        # Banshee has guaranteed_evidence=null
+        result = eliminate_by_guaranteed_evidence(
+            ["Banshee", "Goryo"], ["dots"], "nightmare"
+        )
+        assert "Banshee" in result  # null guaranteed — can't eliminate
+        assert "Goryo" in result    # dots confirmed
+
+    def test_insanity_eliminates_missing_guaranteed(self):
+        from graph.deduction import eliminate_by_guaranteed_evidence
+        # Deogen guaranteed=spirit_box, Moroi guaranteed=spirit_box
+        result = eliminate_by_guaranteed_evidence(
+            ["Deogen", "Moroi", "Banshee"],
+            ["freezing"],  # neither spirit_box confirmed
+            "insanity"
+        )
+        assert "Deogen" not in result
+        assert "Moroi" not in result
+        assert "Banshee" in result  # null guaranteed
+
+    def test_mimic_survives_guaranteed_check(self):
+        from graph.deduction import eliminate_by_guaranteed_evidence
+        # The Mimic has guaranteed_evidence=null, fake_evidence=orb
+        result = eliminate_by_guaranteed_evidence(
+            ["The Mimic", "Goryo"], ["emf_5"], "nightmare"
+        )
+        assert "The Mimic" in result  # null guaranteed — survives
+        assert "Goryo" not in result  # dots not confirmed
+
+    def test_empty_candidates(self):
+        from graph.deduction import eliminate_by_guaranteed_evidence
+        result = eliminate_by_guaranteed_evidence([], ["dots"], "nightmare")
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2: rank_discriminating_tests
+# ---------------------------------------------------------------------------
+
+class TestRankDiscriminatingTests:
+
+    def test_distinct_tests_ranked(self):
+        from graph.deduction import rank_discriminating_tests
+        # Goryo and Banshee have different community tests
+        result = rank_discriminating_tests(["Goryo", "Banshee"])
+        assert len(result) > 0
+        # Each test should have a score
+        for rt in result:
+            assert 0.0 <= rt.score <= 1.0
+
+    def test_single_candidate_returns_its_tests(self):
+        from graph.deduction import rank_discriminating_tests
+        result = rank_discriminating_tests(["Goryo"])
+        assert len(result) > 0
+        assert all(rt.ghost_name == "Goryo" for rt in result)
+
+    def test_zero_candidates_returns_empty(self):
+        from graph.deduction import rank_discriminating_tests
+        result = rank_discriminating_tests([])
+        assert result == []
+
+    def test_unique_test_scores_high(self):
+        from graph.deduction import rank_discriminating_tests
+        result = rank_discriminating_tests(["Goryo", "Banshee"])
+        # Tests unique to one ghost should score 1.0
+        unique_tests = [rt for rt in result if rt.score == 1.0]
+        assert len(unique_tests) > 0
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2: apply_soft_fact_eliminators
+# ---------------------------------------------------------------------------
+
+class TestApplySoftFactEliminators:
+
+    def test_male_ghost_eliminates_female_only(self):
+        from graph.deduction import apply_soft_fact_eliminators, all_ghost_names
+        candidates = all_ghost_names()
+        eliminated = apply_soft_fact_eliminators(
+            {"model_gender": "male"}, candidates
+        )
+        assert "Banshee" in eliminated
+        assert "Dayan" in eliminated
+
+    def test_unknown_soft_fact_eliminates_nothing(self):
+        from graph.deduction import apply_soft_fact_eliminators, all_ghost_names
+        candidates = all_ghost_names()
+        eliminated = apply_soft_fact_eliminators(
+            {"model_gender": "unknown"}, candidates
+        )
+        assert eliminated == []
+
+    def test_false_soft_fact_eliminates_nothing(self):
+        from graph.deduction import apply_soft_fact_eliminators, all_ghost_names
+        candidates = all_ghost_names()
+        eliminated = apply_soft_fact_eliminators(
+            {"favorite_room_changed": False}, candidates
+        )
+        assert eliminated == []
+
+    def test_favorite_room_changed_eliminates_goryo(self):
+        from graph.deduction import apply_soft_fact_eliminators
+        eliminated = apply_soft_fact_eliminators(
+            {"favorite_room_changed": True}, ["Goryo", "Banshee", "Spirit"]
+        )
+        assert "Goryo" in eliminated
+        assert "Banshee" not in eliminated
+
+    def test_ghost_without_eliminators_survives(self):
+        from graph.deduction import apply_soft_fact_eliminators
+        eliminated = apply_soft_fact_eliminators(
+            {"model_gender": "male"}, ["Spirit"]
+        )
+        assert eliminated == []

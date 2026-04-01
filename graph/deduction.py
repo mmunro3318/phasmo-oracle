@@ -130,6 +130,185 @@ def apply_observation_eliminator(key: str) -> list[str]:
     return entry.get("eliminates", [])
 
 
+# ── Evidence thresholds by difficulty ──────────────────────────────────────
+
+EVIDENCE_THRESHOLDS = {
+    "amateur": 3,
+    "intermediate": 3,
+    "professional": 3,
+    "nightmare": 2,
+    "insanity": 1,
+}
+
+
+def evidence_threshold_reached(
+    confirmed: list[str], difficulty: str
+) -> bool:
+    """Return True if confirmed evidence count meets the difficulty threshold."""
+    threshold = EVIDENCE_THRESHOLDS.get(difficulty, 3)
+    return len(confirmed) >= threshold
+
+
+# ── Guaranteed evidence elimination (Sprint 2) ────────────────────────────
+
+def eliminate_by_guaranteed_evidence(
+    candidates: list[str],
+    evidence_confirmed: list[str],
+    difficulty: str,
+) -> list[str]:
+    """After evidence threshold reached, eliminate ghosts missing guaranteed evidence.
+
+    On Nightmare/Insanity, some ghosts always show one specific evidence type.
+    If that evidence wasn't observed despite reaching the threshold, the ghost
+    can be eliminated.
+
+    On Amateur/Intermediate/Professional all 3 evidence types are visible,
+    so guaranteed evidence adds no extra elimination power — return unchanged.
+
+    Mimic note: The Mimic has guaranteed_evidence=null and fake_evidence=orb.
+    Since guaranteed is null, Mimic always survives this check (falls into the
+    "no guaranteed evidence" branch). Mimic orb elimination is handled by the
+    normal evidence deduction path.
+    """
+    if difficulty not in ("nightmare", "insanity"):
+        return candidates
+
+    db = load_db()
+    confirmed_set = set(evidence_confirmed)
+    remaining = []
+
+    for name in candidates:
+        ghost = next(
+            (g for g in db["ghosts"] if g["name"] == name), None
+        )
+        if ghost is None:
+            remaining.append(name)
+            continue
+
+        guaranteed = ghost.get("guaranteed_evidence")
+        if guaranteed is None:
+            # No guaranteed evidence — can't eliminate this way
+            remaining.append(name)
+        elif guaranteed in confirmed_set:
+            # Guaranteed evidence was found — keep
+            remaining.append(name)
+        # else: guaranteed evidence NOT found — eliminate
+
+    return remaining
+
+
+# ── Discriminating test ranker (Sprint 2) ─────────────────────────────────
+
+from dataclasses import dataclass
+
+
+@dataclass
+class RankedTest:
+    """A community test ranked by its discrimination power."""
+    ghost_name: str
+    test_name: str
+    procedure: str
+    confidence: str
+    score: float  # Higher = more discriminating
+
+
+def rank_discriminating_tests(candidates: list[str]) -> list["RankedTest"]:
+    """Return community tests ranked by how well they discriminate among candidates.
+
+    A test unique to one ghost scores highest (confirms/denies that ghost).
+    A test shared by all candidates scores 0 (tells you nothing).
+    """
+    if len(candidates) <= 1:
+        # Single or zero candidates — return all tests for the one ghost unranked
+        if candidates:
+            ghost = get_ghost(candidates[0])
+            if ghost:
+                return [
+                    RankedTest(
+                        ghost_name=candidates[0],
+                        test_name=t.get("name", "unnamed"),
+                        procedure=t.get("procedure", ""),
+                        confidence=t.get("confidence", "unknown"),
+                        score=1.0,
+                    )
+                    for t in ghost.get("community_tests", [])
+                ]
+        return []
+
+    # Collect all tests from all candidates
+    all_tests: list[RankedTest] = []
+    n = len(candidates)
+
+    for name in candidates:
+        ghost = get_ghost(name)
+        if not ghost:
+            continue
+        for t in ghost.get("community_tests", []):
+            # Score: how unique is this test to this ghost among candidates?
+            # Count how many OTHER candidates also have a test with the same name
+            test_name = t.get("name", "unnamed")
+            shared_count = 0
+            for other_name in candidates:
+                if other_name == name:
+                    continue
+                other = get_ghost(other_name)
+                if other and any(
+                    ot.get("name") == test_name
+                    for ot in other.get("community_tests", [])
+                ):
+                    shared_count += 1
+
+            # Score: 1.0 if unique to this ghost, 0.0 if all candidates share it
+            score = 1.0 - (shared_count / (n - 1)) if n > 1 else 1.0
+
+            all_tests.append(RankedTest(
+                ghost_name=name,
+                test_name=test_name,
+                procedure=t.get("procedure", ""),
+                confidence=t.get("confidence", "unknown"),
+                score=score,
+            ))
+
+    # Sort by score descending, then by ghost name for stability
+    all_tests.sort(key=lambda t: (-t.score, t.ghost_name))
+    return all_tests
+
+
+# ── Soft fact eliminators (Sprint 2) ──────────────────────────────────────
+
+def apply_soft_fact_eliminators(
+    soft_facts: dict, candidates: list[str]
+) -> list[str]:
+    """Return ghost names that should be eliminated based on soft facts.
+
+    Reads `soft_fact_eliminators` from each ghost's YAML entry.
+    Returns a list of ghost names to eliminate (not the surviving list).
+    """
+    db = load_db()
+    to_eliminate = []
+
+    for name in candidates:
+        ghost = next(
+            (g for g in db["ghosts"] if g["name"] == name), None
+        )
+        if not ghost:
+            continue
+
+        eliminators = ghost.get("soft_fact_eliminators", {})
+        for fact_key, rule in eliminators.items():
+            fact_value = soft_facts.get(fact_key)
+            # Skip unknown/unset facts
+            if fact_value is None or fact_value == "unknown" or fact_value is False:
+                continue
+            eliminates_if = rule.get("eliminates_if")
+            if eliminates_if is not None and fact_value == eliminates_if:
+                if name not in to_eliminate:
+                    to_eliminate.append(name)
+                break  # One match is enough to eliminate
+
+    return to_eliminate
+
+
 def get_ghost(name: str) -> dict | None:
     """Return a ghost dict by name (case-insensitive), or None."""
     db = load_db()
