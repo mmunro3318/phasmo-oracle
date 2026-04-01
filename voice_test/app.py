@@ -4,11 +4,14 @@ Oracle Voice Tester
 -------------------
 Hear the Kokoro ONNX voices speak lines from Phasmophobia investigation reports.
 Type a voice name at the prompt and the Oracle will deliver a random field dispatch.
+
+Model files are downloaded automatically on first run (~90 MB, int8 quantised).
 """
 
 import os
 import random
 import sys
+import urllib.request
 from pathlib import Path
 
 import sounddevice as sd
@@ -17,6 +20,7 @@ from kokoro_onnx import Kokoro
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
+from rich.progress import BarColumn, DownloadColumn, Progress, TransferSpeedColumn
 from rich.prompt import Prompt
 from rich.table import Table
 
@@ -25,8 +29,15 @@ from rich.table import Table
 load_dotenv(Path(__file__).parent / ".env.local")
 
 AUDIO_DEVICE = os.getenv("AUDIO_DEVICE") or None   # None = system default
-MODEL_PATH   = Path(__file__).parent / "kokoro-v0_19.onnx"
-VOICES_PATH  = Path(__file__).parent / "voices.bin"
+DIR          = Path(__file__).parent
+MODEL_PATH   = DIR / "kokoro-v1.0.int8.onnx"       # ~88 MB — smallest full-quality build
+VOICES_PATH  = DIR / "voices-v1.0.bin"
+
+_RELEASE = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+DOWNLOADS = {
+    MODEL_PATH:  f"{_RELEASE}/kokoro-v1.0.int8.onnx",
+    VOICES_PATH: f"{_RELEASE}/voices-v1.0.bin",
+}
 
 # ── Voice catalogue ──────────────────────────────────────────────────────────
 
@@ -75,6 +86,43 @@ SENTENCES = [
 console = Console()
 
 
+def download_models() -> None:
+    """Download missing model files with a Rich progress bar."""
+    missing = {p: url for p, url in DOWNLOADS.items() if not p.exists()}
+    if not missing:
+        return
+
+    console.print("[yellow]Model files not found — downloading now…[/yellow]")
+    for path, url in missing.items():
+        console.print(f"  [dim]{path.name}[/dim]  ← {url}")
+
+    console.print()
+    with Progress(
+        "[progress.description]{task.description}",
+        BarColumn(),
+        DownloadColumn(),
+        TransferSpeedColumn(),
+        console=console,
+    ) as progress:
+        for path, url in missing.items():
+            task = progress.add_task(path.name, total=None)
+
+            def _hook(block_num, block_size, total_size, _task=task):
+                if total_size > 0:
+                    progress.update(_task, total=total_size,
+                                    completed=block_num * block_size)
+
+            try:
+                urllib.request.urlretrieve(url, path, reporthook=_hook)
+                progress.update(task, completed=progress.tasks[task.id].total)
+            except Exception as exc:
+                console.print(f"\n[red]Download failed:[/red] {exc}")
+                path.unlink(missing_ok=True)
+                sys.exit(1)
+
+    console.print("[green]✓[/green] Downloads complete.\n")
+
+
 def build_voice_table() -> Table:
     """Render a two-column table of available voices."""
     table = Table(
@@ -87,10 +135,8 @@ def build_voice_table() -> Table:
     table.add_column("🇬🇧  British", style="cyan", no_wrap=True)
     table.add_column("🇺🇸  American", style="green", no_wrap=True)
 
-    for gb, us in zip(BRITISH, AMERICAN + [""]):
+    for gb, us in zip(BRITISH, AMERICAN):
         table.add_row(gb, us)
-
-    # Any overflow American voices (list lengths differ by one)
     for us in AMERICAN[len(BRITISH):]:
         table.add_row("", us)
 
@@ -101,10 +147,7 @@ def speak(voice: str, text: str, kokoro: Kokoro) -> None:
     lang = ALL_VOICES[voice]
     samples, sample_rate = kokoro.create(text, voice=voice, speed=1.0, lang=lang)
 
-    device_kwargs = {}
-    if AUDIO_DEVICE:
-        device_kwargs["device"] = AUDIO_DEVICE
-
+    device_kwargs = {"device": AUDIO_DEVICE} if AUDIO_DEVICE else {}
     sd.play(samples, samplerate=sample_rate, **device_kwargs)
     sd.wait()
 
@@ -112,25 +155,17 @@ def speak(voice: str, text: str, kokoro: Kokoro) -> None:
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    # Validate model files exist before loading
-    for path, label in [(MODEL_PATH, "kokoro-v0_19.onnx"), (VOICES_PATH, "voices.bin")]:
-        if not path.exists():
-            console.print(
-                f"[bold red]Missing:[/bold red] {label}\n"
-                f"[dim]Expected at: {path}[/dim]\n\n"
-                "Download both files from [link=https://huggingface.co/hexgrad/Kokoro-82M]"
-                "huggingface.co/hexgrad/Kokoro-82M[/link] and place them in voice_test/."
-            )
-            sys.exit(1)
-
     console.print(Panel(
         "[bold white]Oracle Voice Tester[/bold white]\n"
         "[dim]Powered by Kokoro ONNX · Phasmophobia Edition[/dim]",
         border_style="cyan",
         expand=False,
     ))
+    console.print()
 
-    console.print("\nLoading voice model…", style="dim")
+    download_models()
+
+    console.print("Loading voice model…", style="dim")
     kokoro = Kokoro(str(MODEL_PATH), str(VOICES_PATH))
     console.print("[green]✓[/green] Model ready.\n")
 
