@@ -1,63 +1,114 @@
 # Deterministic ghost tests — pass/fail checks that help identify or eliminate ghosts.
 # test_type: "positive" means the test passes if behavior IS observed.
 #            "negative" means the test passes if behavior is NOT observed.
+#
+# 26 of 27 ghosts covered. The Mimic has no behavioral test — its identifier
+# is the 4th evidence type (fake Ghost Orbs), handled by evidence deduction.
 
-goryo:
-  description: "The Goryo cannot change favorite rooms. If the ghost changed rooms, it's not a Goryo."
-  test_type: "negative"
+# ── Existing tests (reviewed and corrected) ────────────────────────────────
 
 banshee:
   description: "The Banshee targets one player and won't switch until that player dies. If it targeted multiple players, it's not a Banshee."
   test_type: "negative"
 
 deogen:
-  description: "The Deogen is faster when close to a player but very slow during a hunt when far away. Watch for extreme speed changes based on distance."
+  description: "The Deogen charges at 3.0 m/s when far from a player but slows to a near-crawl when it gets close. If the ghost rushing at you suddenly becomes very slow as it approaches, it could be a Deogen."
   test_type: "positive"
 
-thaye:
-  description: "The Thaye ages and slows down over time during the investigation. If the ghost gets noticeably slower as time passes, it could be a Thaye."
-  test_type: "positive"
-
-revenant:
-  description: "The Revenant is very fast when it sees a player but very slow when it doesn't have line of sight. Watch for extreme speed variance."
-  test_type: "positive"
-
-wraith:
-  description: "The Wraith never steps in salt. If the ghost stepped in salt and left footprints, it's not a Wraith."
+goryo:
+  description: "The Goryo cannot change favorite rooms. If the ghost changed rooms, it's not a Goryo."
   test_type: "negative"
 
-mare:
-  description: "The Mare hunts more often in the dark and less often with lights on. Try toggling lights to observe hunt frequency changes."
-  test_type: "positive"
-
-oni:
-  description: "The Oni is very active and throws objects with more force. If the ghost is very quiet with little activity, it's probably not an Oni."
-  test_type: "positive"
-
-phantom:
-  description: "The Phantom disappears when you take a photo of it during a ghost event. Take a photo during an event — if it vanishes, could be a Phantom."
+hantu:
+  description: "The Hantu emits visible freezing breath near its head during hunts when the breaker is off. Turn off the breaker and watch for steam near the ghost — no other ghost does this."
   test_type: "positive"
 
 jinn:
   description: "The Jinn cannot use its speed ability when the breaker is off. Turn off the breaker and observe if the ghost loses its speed boost during hunts."
   test_type: "positive"
 
-shade:
-  description: "The Shade is less active when players are nearby. If ghost activity drops when you're in the ghost room, it could be a Shade."
+mare:
+  description: "The Mare hunts more often in the dark and less often with lights on. Try toggling lights to observe hunt frequency changes."
+  test_type: "positive"
+
+moroi:
+  description: "The Moroi curses players through the spirit box, draining sanity faster. If sanity drops rapidly after spirit box use, it could be a Moroi."
   test_type: "positive"
 
 myling:
   description: "The Myling produces quieter footsteps during a hunt. If you can only hear footsteps when the ghost is very close, it could be a Myling."
   test_type: "positive"
 
-raiju:
-  description: "The Raiju moves faster near active electronics during a hunt. Place active equipment and observe speed changes."
-  test_type: "positive"
-
 obake:
   description: "The Obake can leave unique 6-fingered handprints. Check UV fingerprints carefully for an extra finger."
   test_type: "positive"
 
-moroi:
-  description: "The Moroi curses players through the spirit box, draining sanity faster. If sanity drops rapidly after spirit box use, it could be a Moroi."
+oni:
+  description: "The Oni can never produce an airball ghost event — the smoke ball that flies at a player with a hiss. If you observe an airball event, it is definitely not an Oni."
+  test_type: "negative"
+
+phantom:
+  description: "The Phantom disappears when you take a photo of it during a ghost event. Take a photo during an event — if it vanishes, could be a Phantom."
+  test_type: "positive"
+
+raiju:
+  description: "The Raiju moves faster near active electronics during a hunt. Place active equipment and observe speed changes."
+  test_type: "positive"
+
+revenant:
+  description: "The Revenant is very fast when it detects a player but very slow otherwise. Watch for extreme speed variance — slow shuffle then sudden charge."
+  test_type: "positive"
+
+shade:
+  description: "The Shade is less active when players are nearby. If ghost activity drops when you're in the ghost room, it could be a Shade."
+  test_type: "positive"
+
+thaye:
+  description: "The Thaye ages and slows down over time during the investigation. If the ghost gets noticeably slower as time passes, it could be a Thaye."
+  test_type: "positive"
+
+wraith:
+  description: "The Wraith never steps in salt. If the ghost stepped in salt and left footprints, it's not a Wraith."
+  test_type: "negative"
+
+# ── New tests (Sprint 3b audit) ────────────────────────────────────────────
+
+dayan:
+  description: "The Dayan slows significantly when nearby players stop moving. During a hunt, freeze completely — if the ghost's footsteps slow down noticeably, it could be a Dayan."
+  test_type: "positive"
+
+demon:
+  description: "The Demon has the shortest hunt cooldown — it can start a new hunt in under 25 seconds. If a new hunt begins less than 25 seconds after the last one ended, it's a Demon."
+  test_type: "positive"
+
+gallu:
+  description: "The Gallu cycles through states when provoked by salt. If the ghost steps in salt and then hunts noticeably faster, followed by a slower hunt afterward, that pattern confirms Gallu."
+  test_type: "positive"
+
+obambo:
+  description: "The Obambo can switch states mid-hunt, causing an abrupt unexplained speed change during a single hunt. If the ghost's speed changes suddenly for no visible reason while hunting, it could be an Obambo."
+  test_type: "positive"
+
+onryo:
+  description: "The Onryo is forced to hunt after the third candle blowout, regardless of sanity. At high sanity, place a lit candle near the ghost and let it blow out three times — a hunt on the third blowout confirms Onryo."
+  test_type: "positive"
+
+poltergeist:
+  description: "The Poltergeist can throw multiple objects simultaneously. Spread several items across the ghost room — if they all fly at once, it's a Poltergeist."
+  test_type: "positive"
+
+spirit:
+  description: "The Spirit is suppressed by smudge sticks for 3 full minutes — all other ghosts resume hunting after 90 seconds. Smudge the ghost and time until the next hunt. If no hunt for over 90 seconds, Spirit is strongly indicated."
+  test_type: "positive"
+
+the_twins:
+  description: "The Twins can interact in two separate locations almost simultaneously. Place EMF readers in the ghost room and an adjacent room — if both activate within a second of each other, it's The Twins."
+  test_type: "positive"
+
+yokai:
+  description: "The Yokai cannot hear players or detect electronics beyond 2.5 meters. Stand more than 3 meters from the ghost with an active electronic and speak loudly — if the ghost shows no reaction, it could be a Yokai."
+  test_type: "positive"
+
+yurei:
+  description: "The Yurei ability causes a nearby door to slowly and fully close while all players within range lose about 15% sanity simultaneously. If a door moves very slowly to fully closed and your sanity drops at the same moment, that's the Yurei."
   test_type: "positive"

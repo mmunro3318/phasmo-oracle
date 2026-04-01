@@ -43,10 +43,11 @@ def narrow_candidates(
     """Return ghosts consistent with the current evidence state.
 
     Rules:
-    - A ghost is eliminated if it lacks any confirmed evidence type.
-      Exception (Nightmare/Insanity): a ghost may hide non-guaranteed evidence.
-    - A ghost is eliminated if it has any ruled-out evidence type.
-      Exception (Mimic): its fake_evidence field is not real evidence.
+    - A ghost is eliminated if it lacks any confirmed evidence type (all difficulties).
+    - On Standard: a ghost is eliminated if it has any ruled-out evidence type.
+    - On Nightmare/Insanity: ruled-out evidence does NOT eliminate ghosts (the ghost
+      could be hiding it). EXCEPTION: fake_evidence (Mimic's orbs) is never hidden —
+      ruling out orbs eliminates the Mimic on all difficulties.
     - A ghost explicitly in `eliminated` is always removed.
     """
     db = load_db()
@@ -71,14 +72,24 @@ def narrow_candidates(
             continue
 
         # --- Ruled-out check ---
-        # A ghost is eliminated if it has any ruled-out evidence in its
-        # observable set. This includes fake_evidence — if Ghost Orbs are
-        # ruled out, the Mimic is eliminated because it ALWAYS produces orbs.
         skip = False
-        for e in ruled_out:
-            if e in observable_set:
+        if not permissive:
+            # Standard: a ghost is eliminated if any ruled-out evidence is
+            # in its observable set (real evidence + fake evidence).
+            for e in ruled_out:
+                if e in observable_set:
+                    skip = True
+                    break
+        else:
+            # Nightmare/Insanity: the ghost hides evidence from the player,
+            # so "ruled out" could mean "hidden, not absent." Ruling out
+            # evidence does NOT eliminate ghosts on these difficulties.
+            #
+            # ONE EXCEPTION: fake_evidence is NEVER hidden. The Mimic
+            # always produces Ghost Orbs. If orbs are ruled out, the
+            # Mimic is eliminated — no other ghost is affected.
+            if fake and fake in set(ruled_out):
                 skip = True
-                break
         if skip:
             continue
 

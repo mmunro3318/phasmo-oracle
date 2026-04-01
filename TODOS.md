@@ -28,11 +28,9 @@ The current `InputProvider`/`OutputHandler` protocols are synchronous (text mode
 ---
 
 ## Ghost test completeness audit
-**Priority:** P2 | **Effort:** S (CC: ~15 min) | **Sprint:** 3b (bundled)
+**Status:** RESOLVED
 
-`ghost_tests.yaml` currently covers 15 of 27 ghosts. Audit the Ghost ID Guide for all testable behaviors and add missing entries. Some ghosts may not have reliable deterministic tests — mark those with `no_test: true`.
-
-**Where to start:** Read `docs/Ghost Identification Guide.md` and cross-reference with existing entries in `oracle/config/ghost_tests.yaml`.
+Expanded from 15 to 26 of 27 ghosts. Fixed 2 factual errors (Deogen speed direction, Oni fabricated trait). The Mimic has no behavioral test — its identifier is the 4th evidence type, handled by evidence deduction.
 
 ---
 
