@@ -158,11 +158,6 @@ If you've never set up a Python project before, follow this section first. If yo
 git clone https://github.com/mmunro3318/phasmo-oracle.git
 cd phasmo-oracle
 
-# Dev/experimentation is generally on `claude-code-dev` branch
-# Checkout this branch for most current version, `main` is most stable version
-git fetch origin
-git checkout claude-code-dev
-
 python -m venv .venv
 .venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
 pip install -e ".[dev]"
@@ -170,8 +165,27 @@ ollama pull qwen2.5:7b          # you may have to run the model in separate term
 python main.py --check
 python main.py
 ```
+---
+
+### Voice Tester (Experimental)
+
+Want to hear the Oracle speak? Check out the `voice_test/` sub-app. It's a standalone terminal tool that plays Phasmophobia-themed dispatches through any Kokoro ONNX voice. Model files download automatically on first run.
+
+**Quick Start**
+
+```bash
+pip install -r voice_test/requirements.txt
+python voice_test/app.py
+```
+
+See `voice_test/README.md` for full setup details (including how to configure your audio output device).
+
+---
 
 ### Step-by-step (VS Code on Windows)
+
+Want to hear the Oracle speak? Check out the voice_test/ sub-app on the feature/voice-test-app branch.
+It's a standalone terminal tool that plays Phasmophobia-themed dispatches through any Kokoro ONNX voice. Model files download automatically on first run.
 
 **1. Clone the project**
 
@@ -180,10 +194,6 @@ Open a terminal (Command Prompt, PowerShell, or VS Code terminal) and run:
 ```
 git clone https://github.com/mmunro3318/phasmo-oracle.git
 cd phasmo-oracle
-
-# If you want my more recent/experimental build, switch to branch:
-git fetch origin
-git checkout claude-code-dev
 ```
 
 **2. Open in VS Code**
