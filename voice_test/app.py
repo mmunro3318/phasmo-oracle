@@ -14,6 +14,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
+import scipy.signal as sps
 import sounddevice as sd
 from dotenv import load_dotenv
 from kokoro_onnx import Kokoro
@@ -110,11 +111,11 @@ def download_models() -> None:
             def _hook(block_num, block_size, total_size, _task=task):
                 if total_size > 0:
                     progress.update(_task, total=total_size,
-                                    completed=block_num * block_size)
+                                    completed=min(block_num * block_size, total_size))
 
             try:
                 urllib.request.urlretrieve(url, path, reporthook=_hook)
-                progress.update(task, completed=progress.tasks[task.id].total)
+                progress.update(task, completed=progress._tasks[task].total)
             except Exception as exc:
                 console.print(f"\n[red]Download failed:[/red] {exc}")
                 path.unlink(missing_ok=True)
@@ -147,8 +148,19 @@ def speak(voice: str, text: str, kokoro: Kokoro) -> None:
     lang = ALL_VOICES[voice]
     samples, sample_rate = kokoro.create(text, voice=voice, speed=1.0, lang=lang)
 
+    # WASAPI (and some other drivers) require audio at the device's native sample
+    # rate. Kokoro outputs 24 kHz; query the target device and resample if needed.
+    device_info = (
+        sd.query_devices(AUDIO_DEVICE, "output")
+        if AUDIO_DEVICE
+        else sd.query_devices(kind="output")
+    )
+    target_rate = int(device_info["default_samplerate"])
+    if target_rate != sample_rate:
+        samples = sps.resample_poly(samples, target_rate, sample_rate)
+
     device_kwargs = {"device": AUDIO_DEVICE} if AUDIO_DEVICE else {}
-    sd.play(samples, samplerate=sample_rate, **device_kwargs)
+    sd.play(samples, samplerate=target_rate, **device_kwargs)
     sd.wait()
 
 

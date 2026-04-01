@@ -20,30 +20,60 @@ Model files (~90 MB total) are downloaded automatically on first run.
 From the repo root:
 
 ```bash
-pip install kokoro-onnx sounddevice python-dotenv rich
+pip install -r voice_test/requirements.txt
 ```
 
-## 2 — Configure your audio device (optional)
+Or manually:
 
 ```bash
-cp voice_test/.env.local.example voice_test/.env.local
+pip install kokoro-onnx sounddevice scipy python-dotenv rich
 ```
 
-To find your device name, run:
+## 2 — Find your audio output device
+
+Run this to list all available audio devices:
 
 ```bash
 python -c "import sounddevice as sd; print(sd.query_devices())"
 ```
 
-Paste the device name (or a unique substring) into `.env.local`:
+You'll see output like:
 
 ```
-AUDIO_DEVICE=MacBook Pro Speakers
+  0 Built-in Microphone           [...]
+  1 Built-in Output               [...]
+  5 Headphones (VK81), MME
+ 14 Headphones (VK81), Windows DirectSound
+ 20 Headphones (VK81), Windows WASAPI     <- most modern, preferred
+ ...
 ```
 
-Leave `AUDIO_DEVICE` blank to use the system default.
+**Important:** On Windows with WASAPI, if you see the same device name with multiple APIs (MME, DirectSound, WASAPI), **use the full string including the API name** for exact matching. For example: `Headphones (VK81), Windows WASAPI`
 
-## 3 — Run it
+If the device name is unique, you can use just the name: `Built-in Output`
+
+## 3 — Configure your audio device
+
+```bash
+cp voice_test/.env.local.example voice_test/.env.local
+```
+
+Edit `.env.local` and set `AUDIO_DEVICE` to your device name (from step 2):
+
+```
+# Option A: Device with unique name
+AUDIO_DEVICE=Built-in Output
+
+# Option B: Device with multiple APIs (Windows) — use full string
+AUDIO_DEVICE=Headphones (VK81), Windows WASAPI
+
+# Option C: Use device index (always works)
+AUDIO_DEVICE=20
+```
+
+Leave blank to use the system default.
+
+## 4 — Run it
 
 ```bash
 python voice_test/app.py
@@ -55,3 +85,9 @@ instantly from the local copies.
 
 You'll see a table of all available voices. Type any voice name at the prompt
 and the Oracle will deliver a random field dispatch in that voice. Press `q` to quit.
+
+---
+
+## Troubleshooting
+
+**"Invalid sample rate \[-9997\]" error:** This happens on Windows with WASAPI when the sample rate doesn't match. Make sure you're using the full device string including the API name (e.g., `Headphones (VK81), Windows WASAPI` not just `Headphones (VK81)`). The app automatically resamples audio to match the device's native rate once it's configured correctly.
