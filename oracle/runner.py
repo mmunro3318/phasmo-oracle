@@ -148,10 +148,7 @@ def _dispatch(engine: InvestigationEngine, intent: ParsedIntent):
         return engine.get_state()
 
     if action == "query_ghost_database":
-        return engine.query_ghost(
-            intent.ghost_name or "",
-            full=(intent.query_field == "full"),
-        )
+        return engine.query_ghost(intent.ghost_name or "")
 
     if action == "suggest_next_evidence":
         return engine.suggest_next()
