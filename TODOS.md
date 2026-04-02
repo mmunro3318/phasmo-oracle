@@ -10,11 +10,9 @@ Kokoro-onnx (82M params) CPU latency is unvalidated on target hardware. Estimate
 ---
 
 ## CLAUDE.md + docs review with /document-release
-**Priority:** P2 | **Effort:** S (CC: ~15 min) | **Sprint:** Post-3b
+**Status:** RESOLVED
 
-After Sprint 3b ships, run `/document-release` to fully review and update CLAUDE.md, README, and other docs. AGENTS.md was archived — CLAUDE.md needs to be the definitive project guide with voice-specific guidance for future sessions.
-
-**Where to start:** Run `/document-release` in a fresh session.
+Ran `/document-release`. README fully rewritten (removed LangGraph/Ollama references, updated architecture, commands, project structure). CLAUDE.md updated with legacy code note, voice testing docs, doc index. Archived 3 stale docs (REFACTOR.md, Oracle Architecture Design.md, Roadmap.md). Sprint 3b doc marked COMPLETE.
 
 ---
 

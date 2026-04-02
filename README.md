@@ -2,11 +2,9 @@
 
 A voice-driven Phasmophobia ghost-identification assistant. Oracle narrows 27 ghost candidates using evidence you report, then responds through a CB radio voice effect.
 
-> **Note:** The sections below this quick-start guide are from an earlier sprint and reference LangGraph/LLM architecture that has been replaced. See `CLAUDE.md` for current architecture. A full README rewrite is planned.
-
 ---
 
-## Quick Start (Sprint 3b)
+## Quick Start
 
 ```bash
 git clone https://github.com/mmunro3318/phasmo-oracle.git
@@ -18,6 +16,12 @@ python -m oracle --text --speak --difficulty professional
 ```
 
 Model files (~90MB) download automatically on first run.
+
+**Text only (no voice):**
+```bash
+pip install -e ".[dev]"
+python -m oracle --text --difficulty professional
+```
 
 ---
 
@@ -72,248 +76,100 @@ Voice names are shown in "The Team" table at startup. Set a default in `.env.loc
 
 ---
 
-## How It Works (Legacy — see CLAUDE.md for current architecture)
+## How It Works
 
-Oracle is a **LangGraph agent with a two-stage chain**, not a raw LLM. The architecture separates three concerns:
-
-1. **Intent parsing** — a deterministic regex router classifies ~85% of inputs instantly (no LLM needed). Ambiguous inputs fall back to an LLM classifier.
-2. **Ghost deduction** — pure Python narrows 27 candidates by evidence type. No model involved.
-3. **Narration** — the LLM generates a 2-sentence response with Oracle's persona (dry British wit).
-
-The LLM never reasons about ghost identity. It can only report what the deduction engine computes.
+Oracle uses a fully deterministic pipeline — no LLM, no cloud APIs, everything runs locally:
 
 ```
-You: "ghost orb confirmed"
-  → Deterministic parser: record_evidence("orb", "confirmed")
-  → Deduction engine narrows candidates: 27 → 11
-  → LLM narrator: "Ghost Orb duly noted. Eleven suspects remain — do carry on."
-
-You: "rule out spirit box"
-  → Deterministic parser: record_evidence("spirit_box", "ruled_out")
-  → Deduction engine narrows candidates: 11 → 4
-  → LLM narrator: "Spirit Box eliminated. Four candidates remain: Goryo, Hantu, Mimic, and Raiju."
+Your command → Regex Parser (instant) → Deduction Engine → Scripted Response → TTS + Radio FX → Speaker
 ```
 
-### Architecture Diagram
-
-```
-user_text → Deterministic Parser (regex, instant)
-                ├── [match] → Tool Execution → LLM Narrator → response
-                └── [no match] → LLM Classifier → Tool Execution → LLM Narrator → response
-```
-
----
-
-## Current Status: Sprint 1 (Text-First)
-
-Oracle currently runs as a text REPL with a Rich terminal display. Voice integration (Whisper STT, Kokoro TTS, wake word detection) is planned for Sprint 2.
+1. **Parser** (`oracle/parser.py`) — regex pattern matching classifies your input into actions (confirm evidence, query ghost, start game, etc.)
+2. **Engine** (`oracle/engine.py`) — pure Python deduction narrows 27 ghost candidates by evidence rules, handles Mimic edge cases, Nightmare/Insanity difficulty thresholds
+3. **Responses** (`oracle/responses.py`) — scripted templates produce natural responses from typed results
+4. **Voice** (`oracle/voice/`) — Kokoro TTS synthesizes speech, CB radio FX chain applies band-pass filter + saturation + confidence-coded static, then plays through speakers
 
 ---
 
 ## Prerequisites (First-Time Setup)
 
-If you've never set up a Python project before, follow this section first. If you already have Python and VS Code, skip to [Installation](#installation).
+### 1. Install Python
 
-### 1. Install VS Code
+1. Download [Python 3.11+](https://www.python.org/downloads/)
+2. **IMPORTANT:** Check **"Add python.exe to PATH"** during installation
+3. Verify: `python --version`
 
-1. Download [Visual Studio Code](https://code.visualstudio.com/) and install it.
-2. Open VS Code, go to Extensions (Ctrl+Shift+X), search for **Python**, and install the Microsoft Python extension.
+### 2. Install Git
 
-### 2. Install Python
-
-1. Download [Python 3.11+](https://www.python.org/downloads/) (click the big yellow "Download Python" button).
-2. **IMPORTANT:** During installation, check the box that says **"Add python.exe to PATH"**. This is the most common setup mistake — if you skip this, nothing works.
-3. After installation, open a new terminal (Command Prompt or PowerShell) and verify:
-   ```
-   python --version
-   ```
-   You should see something like `Python 3.11.9`. If you get "command not found", Python wasn't added to PATH — uninstall and reinstall with the PATH checkbox checked.
-
-### 3. Install Ollama
-
-1. Download [Ollama](https://ollama.com/) and install it.
-2. Ollama runs in the background as a service. After installation, open a terminal and verify:
-   ```
-   ollama --version
-   ```
-3. Pull the AI model Oracle uses (this downloads ~4 GB):
-   ```
-   ollama pull qwen2.5:7b
-   ```
-   This takes a few minutes. Once done, Ollama is ready.
-
-### 4. Install Git (if you don't have it)
-
-1. Download [Git for Windows](https://git-scm.com/download/win) and install with default settings.
+1. Download [Git for Windows](https://git-scm.com/download/win) and install with defaults
 2. Verify: `git --version`
 
+### 3. (Optional) Install VS Code
+
+1. Download [Visual Studio Code](https://code.visualstudio.com/)
+2. Install the **Python** extension (Ctrl+Shift+X → search "Python")
+
 ---
 
-## Installation
-
-### Quick start (for experienced developers)
+## Installation (Step-by-Step)
 
 ```bash
-# In Powershell
+# Clone and enter the project
 git clone https://github.com/mmunro3318/phasmo-oracle.git
 cd phasmo-oracle
 
+# Create and activate virtual environment
 python -m venv .venv
-.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
-pip install -e ".[dev]"
-ollama pull qwen2.5:7b          # you may have to run the model in separate terminal: ollama run qwen2.5:7b
-python main.py --check
-python main.py
-```
----
+.venv\Scripts\activate        # You need to do this every new terminal session
 
-### Voice Tester (Experimental)
+# Install with voice support
+pip install -e ".[dev,voice]"
 
-Want to hear the Oracle speak? Check out the `voice_test/` sub-app. It's a standalone terminal tool that plays Phasmophobia-themed dispatches through any Kokoro ONNX voice. Model files download automatically on first run.
-
-**Quick Start**
-
-```bash
-pip install -r voice_test/requirements.txt
-python voice_test/app.py
+# Run Oracle
+python -m oracle --text --speak --difficulty professional
 ```
 
-See `voice_test/README.md` for full setup details (including how to configure your audio output device).
-
----
-
-### Step-by-step (VS Code on Windows)
-
-Want to hear the Oracle speak? Check out the voice_test/ sub-app on the feature/voice-test-app branch.
-It's a standalone terminal tool that plays Phasmophobia-themed dispatches through any Kokoro ONNX voice. Model files download automatically on first run.
-
-**1. Clone the project**
-
-Open a terminal (Command Prompt, PowerShell, or VS Code terminal) and run:
-
-```
-git clone https://github.com/mmunro3318/phasmo-oracle.git
-cd phasmo-oracle
-```
-
-**2. Open in VS Code**
-
-```
-code .
-```
-
-This opens VS Code in the project folder. If `code .` doesn't work, open VS Code manually and use File → Open Folder.
-
-**3. Create a virtual environment**
-
-Open the VS Code terminal (Ctrl+\` or Terminal → New Terminal) and run:
-
-```
-python -m venv .venv
-```
-
-This creates an isolated Python environment in a `.venv` folder so Oracle's packages don't interfere with anything else on your computer.
-
-**4. Activate the virtual environment**
-
-```
-.venv\Scripts\activate
-```
-
-You should see `(.venv)` appear at the start of your terminal prompt. This means the virtual environment is active. **You need to do this every time you open a new terminal.**
-
-If you get an error about "execution of scripts is disabled", run this first:
-
+If you get "execution of scripts is disabled":
 ```
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-Then try activating again.
-
-**5. Tell VS Code to use this environment**
-
-Press Ctrl+Shift+P, type "Python: Select Interpreter", and choose the one that shows `.venv` in the path (e.g., `.\.venv\Scripts\python.exe`).
-
-**6. Install dependencies**
-
-With the virtual environment active (you should see `(.venv)` in the prompt):
-
-```
-pip install -e ".[dev]"
-```
-
-This installs Oracle and all its dependencies. The `.[dev]` part also installs testing tools. **If you see errors about "setuptools" or "build backend", make sure you're running this from inside the `phasmo-oracle` folder.**
-
-**7. Verify everything works**
-
-```
-python main.py --check
-```
-
-You should see green checkmarks for Ghost database, Ollama connection, and Model available. If Ollama checks fail, make sure Ollama is running (check the system tray) and you've pulled the model (`ollama pull qwen2.5:7b`).
-
-**8. Run Oracle**
-
-```
-python main.py
-```
-
-Type evidence like "ghost orb confirmed" or "rule out spirit box" and Oracle will respond.
-
 ### Troubleshooting
 
-| Problem                            | Fix                                                                               |
-| ---------------------------------- | --------------------------------------------------------------------------------- |
-| `python: command not found`        | Python wasn't added to PATH. Reinstall Python and check "Add to PATH".            |
-| `pip: command not found`           | Same as above — pip comes with Python.                                            |
-| `ModuleNotFoundError`              | Virtual environment isn't active. Run `.venv\Scripts\activate` first.             |
-| `Ollama connection: Not reachable` | Ollama isn't running. Start it from the Start menu or system tray.                |
-| `Model not pulled`                 | Run `ollama pull qwen2.5:7b` and wait for it to download.                         |
-| `execution of scripts is disabled` | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`        |
-| Conda conflicts                    | Don't use conda. Use `python -m venv .venv` instead. Oracle is designed for venv. |
+| Problem | Fix |
+|---------|-----|
+| `python: command not found` | Reinstall Python with "Add to PATH" checked |
+| `ModuleNotFoundError` | Activate the venv: `.venv\Scripts\activate` |
+| `execution of scripts is disabled` | Run the `Set-ExecutionPolicy` command above |
+| No audio output | Check `.env.local` for `AUDIO_DEVICE` setting |
 
 ---
 
 ## Configuration
 
-All settings live in `config/.env.local` (gitignored). If the file doesn't exist, defaults are used.
+Settings live in `.env.local` at the project root (gitignored).
 
 ```env
-# LLM model (must support Ollama tool calling)
-OLLAMA_MODEL=qwen2.5:7b
-OLLAMA_BASE_URL=http://localhost:11434
+# Voice name (see "The Team" table at startup for options)
+KOKORO_VOICE=bm_fable
 
-# Game difficulty
-DIFFICULTY=professional
-# Options: amateur, intermediate, professional, nightmare, insanity
+# Audio output device (leave empty for system default)
+# AUDIO_DEVICE=
 ```
 
 ---
 
-## Usage
+## Development
 
 ```bash
-# Text mode (Sprint 1 — default)
-python main.py
+# Run all tests
+pytest tests/ -v
 
-# Override difficulty for this session
-python main.py --difficulty nightmare
+# Run with Kokoro integration tests (requires model files)
+pytest tests/ -v --run-integration
 
-# Run startup diagnostics only
-python main.py --check
-```
-
-### Text commands (natural language)
-
-```
-"new game on professional"           → starts a new investigation
-"ghost orb confirmed"                → confirms Ghost Orb evidence
-"we found freezing temps"            → confirms Freezing Temperatures
-"rule out spirit box"                → rules out Spirit Box
-"no EMF 5"                           → rules out EMF Level 5
-"what ghosts are left?"              → shows current investigation state
-"what does the Banshee do?"          → looks up Banshee in the database
-"the ghost stepped in salt"          → logs behavioral observation, eliminates Wraith
+# Preview radio FX tuning
+python tools/radio_preview.py
 ```
 
 ---
@@ -322,73 +178,38 @@ python main.py --check
 
 ```
 phasmo-oracle/
-├── main.py                        # Entry point — text REPL, Rich display, diagnostics
-├── config/
-│   ├── settings.py                # pydantic-settings config from .env.local
-│   ├── .env.local.example         # Configuration template
-│   ├── ghost_database.yaml        # 27 ghosts — evidence, tells, eliminators
-│   └── evidence_synonyms.yaml     # Maps LLM-generated strings to canonical IDs
-├── graph/
-│   ├── intent_router.py           # Deterministic regex intent parser
-│   ├── state.py                   # OracleState TypedDict
-│   ├── deduction.py               # Pure Python candidate narrowing (no LLM)
-│   ├── tools.py                   # 5 LangChain tools + state management
-│   ├── llm.py                     # LLM factory (init once, use everywhere)
-│   ├── nodes.py                   # Graph nodes: parse, classify, execute, narrate
-│   └── graph.py                   # StateGraph assembly (two-stage chain)
-├── tests/                         # 222 tests (no Ollama needed for most)
-├── docs/                          # Architecture docs, sprint plans, roadmap
-├── CLAUDE.md                      # Claude Code project guidance
-├── AGENTS.md                      # Cross-tool AI assistant guide
-└── TODOS.md                       # Deferred work items
+├── oracle/
+│   ├── parser.py              # Deterministic regex command parser
+│   ├── engine.py              # Investigation engine — all game state + deduction
+│   ├── deduction.py           # Pure Python candidate narrowing (no LLM)
+│   ├── responses.py           # Scripted response templates
+│   ├── runner.py              # Main loop, I/O protocols, CLI entry point
+│   ├── state.py               # Type definitions (EvidenceID, Difficulty)
+│   ├── voice/
+│   │   ├── tts.py             # Kokoro TTS wrapper (swappable via TTSProvider)
+│   │   ├── radio_fx.py        # CB radio FX chain (band-pass, saturation, noise)
+│   │   └── audio_config.py    # Audio pipeline constants + voice catalogue
+│   └── config/
+│       ├── ghost_database.yaml    # 27 ghosts — evidence, tells, eliminators
+│       ├── ghost_tests.yaml       # 26 deterministic ghost tests
+│       └── evidence_synonyms.yaml # Maps spoken evidence to canonical IDs
+├── tests/                     # ~500 tests (no audio deps needed)
+├── tools/
+│   └── radio_preview.py       # Standalone radio FX tuning tool
+├── docs/                      # Sprint specs, ghost guides
+├── CLAUDE.md                  # Project guide for AI assistants
+├── BENCHMARK_GUIDE.md         # Kokoro TTS latency benchmarking
+└── TODOS.md                   # Deferred work items
 ```
-
----
-
-## Development
-
-```bash
-# Run all tests (no Ollama needed for most)
-pytest tests/ -v
-
-# Run only non-LLM tests (fast, no dependencies)
-pytest tests/ -m "not llm" -v
-
-# Run LLM-dependent tests (requires Ollama with qwen2.5:7b)
-pytest tests/ -m llm -v
-```
-
-### Key test files
-
-| File                     | Tests                                                                | Ollama? |
-| ------------------------ | -------------------------------------------------------------------- | ------- |
-| `test_deduction.py`      | 27-ghost parametrized deduction, Mimic edge case, Nightmare/Insanity | No      |
-| `test_intent_router.py`  | 74 natural language → intent classification tests                    | No      |
-| `test_tools.py`          | All 5 tools, synonyms, over-proofed detection                        | No      |
-| `test_nodes.py`          | Graph node functions, routing logic                                  | No      |
-| `test_llm.py`            | LLM factory with mocked Ollama                                       | No      |
-| `test_intent_parsing.py` | LLM intent parsing regression tests                                  | Yes     |
-
----
-
-## Sprint Roadmap
-
-| Sprint | Focus                                                                   | Status          |
-| ------ | ----------------------------------------------------------------------- | --------------- |
-| 1      | Core agent loop — text mode, deduction engine, 5 tools, two-stage chain | **In Progress** |
-| 2      | Full conditional graph + voice shell (Whisper / Kokoro)                 | Planned         |
-| 3      | Steam routing via Voicemeeter + dual-output TTS                         | Planned         |
-| 4      | Bidirectional — second player queries Oracle via loopback               | Planned         |
-| 5      | API fallback, terminal UI polish, session replay, diagnostics           | Planned         |
-| 6      | Session persistence, game metrics, `--stats` flag                       | Planned         |
-| 7      | Behavioral reasoning — speed, visibility, hunting profiles              | Planned         |
 
 ---
 
 ## Docs
 
-- [AGENTS.md](AGENTS.md) — AI assistant guide: invariants, state flow, tool reference
-- [CLAUDE.md](CLAUDE.md) — Claude Code-specific project guidance
-- [Oracle Architecture Design](docs/Oracle%20Architecture%20Design.md) — full rationale for tool-calling agent design
-- [Roadmap](docs/Roadmap.md) — seven-sprint overview with exit criteria
-- Sprint plans: [Sprint 1](docs/Sprint%201/) through [Sprint 6](docs/Sprint%206/)
+| Document | Purpose |
+|----------|---------|
+| [CLAUDE.md](CLAUDE.md) | Project guide — architecture, invariants, build/test commands |
+| [INSIGHTS.md](INSIGHTS.md) | Lessons from the LangGraph→deterministic pivot |
+| [BENCHMARK_GUIDE.md](BENCHMARK_GUIDE.md) | How to measure TTS latency on your hardware |
+| [Ghost Identification Guide](docs/Ghost%20Identification%20Guide.md) | Phasmophobia game mechanics reference |
+| [Sprint 3b](docs/Sprint%203b%20-%20Voice%20Pipeline.md) | Voice output sprint spec (complete) |

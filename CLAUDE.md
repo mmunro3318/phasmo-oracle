@@ -47,7 +47,7 @@ python tools/radio_preview.py
 
 - Voice unit tests mock Kokoro and sounddevice — they run without audio deps
 - Tests marked `@pytest.mark.integration` need real Kokoro model files
-- All 488+ tests should pass with `pytest tests/ -v` (no voice deps needed)
+- All tests should pass with `pytest tests/ -v` (no voice deps needed)
 - Audio invariant: all audio is float32, clipped to [-1.0, 1.0] before playback
 - Sprint 3c note: when adding InputStream (STT), switch `sd.play()` to `blocking=True`
 
@@ -88,6 +88,7 @@ user_text → parser.py (regex + fuzzy matching, instant)
 ## Key Design Decisions
 
 - **Pivot from LangGraph/LLM (2026-04-01)** — LLM narration was buggy and added 2-5s latency. See `INSIGHTS.md` for lessons learned. Archived code in `archive/langgraph-v1/`.
+- **Legacy code:** `main.py` and `graph/` at project root are from the pre-pivot LangGraph architecture. Not used — the current entry point is `oracle/runner.py`. Do not modify these files.
 - **InvestigationEngine class** replaces the old `_state` dict + `bind_state()`/`sync_state_from()` pattern. State is owned, not borrowed.
 - **Typed result dataclasses** as the engine→response contract. One dataclass per action type (EvidenceResult, GhostQueryResult, etc.).
 - **I/O Protocols** allow swapping text↔voice without touching the runner loop.
@@ -100,5 +101,7 @@ user_text → parser.py (regex + fuzzy matching, instant)
 | Document | Read when... |
 |----------|-------------|
 | `INSIGHTS.md` | Understanding why we pivoted from LLM to deterministic |
-| `archive/langgraph-v1/` | Reference for the old LangGraph implementation |
+| `BENCHMARK_GUIDE.md` | Measuring Kokoro TTS latency on target hardware |
 | `docs/Ghost Identification Guide.md` | Game mechanics reference |
+| `docs/Sprint 3b - Voice Pipeline.md` | Voice output sprint spec (complete) |
+| `archive/langgraph-v1/` | Reference for the old LangGraph implementation |

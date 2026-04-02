@@ -1,6 +1,6 @@
 # Sprint 3b — Voice Pipeline
 
-**Status:** Not started
+**Status:** COMPLETE (2026-04-01)
 **Depends on:** Sprint 3a (text mode rewrite) — COMPLETE on `refactor/voice-first-pivot`
 **Design doc:** `~/.gstack/projects/mmunro3318-phasmo-oracle/mmunr-unknown-design-20260401-030722.md`
 **Eng review plan:** `~/.claude/plans/elegant-knitting-river.md`

@@ -9,8 +9,8 @@ pip install -e ".[voice]"
 
 # Download model files (one-time, ~300MB total)
 # Place in project root, oracle/voice/, or ~/.cache/kokoro-onnx/
-wget https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx
-wget https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
+## Note: Model files download automatically on first `--speak` run.
+## Manual download is optional — only needed for standalone benchmarking.
 ```
 
 On Windows without wget, download manually from:
@@ -27,7 +27,7 @@ import numpy as np
 
 print('Loading model...')
 t0 = time.perf_counter()
-model = Kokoro('kokoro-v1.0.onnx', 'voices-v1.0.bin')
+model = Kokoro('oracle/voice/kokoro-v1.0.int8.onnx', 'oracle/voice/voices-v1.0.bin')
 print(f'Model load: {(time.perf_counter()-t0)*1000:.0f}ms')
 
 phrases = [
