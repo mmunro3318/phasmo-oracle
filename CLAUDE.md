@@ -7,8 +7,8 @@
 
 Oracle is a Phasmophobia ghost-identification voice assistant. A deterministic regex parser handles ~90% of inputs instantly. A pure Python deduction engine handles all candidate narrowing. Scripted response templates produce all output text. No LLM dependencies in the core pipeline.
 
-**Current sprint:** Sprint 3b — Voice Output (TTS + Radio FX)
-**Next:** Sprint 3c — Voice Input (STT + Wake Word + Async State Machine)
+**Current sprint:** Sprint 3c — Voice Input (STT + Wake Word + Barge-In)
+**Next:** Sprint 3d — GPU Acceleration + Field Test
 
 ## Hard Invariants — Never Break These
 
@@ -24,8 +24,11 @@ Oracle is a Phasmophobia ghost-identification voice assistant. A deterministic r
 # Install dependencies (text only)
 pip install -e ".[dev]"
 
-# Install with voice output
+# Install with voice output (TTS + radio FX)
 pip install -e ".[dev,voice]"
+
+# Install with voice input + output (wake word + STT + TTS)
+pip install -e ".[dev,voice-full]"
 
 # Run all tests (voice tests use mocks — no audio hardware needed)
 pytest tests/ -v
@@ -39,17 +42,20 @@ python -m oracle --text --difficulty professional
 # Start Oracle with voice output (CB radio FX)
 python -m oracle --text --speak --difficulty professional
 
+# Start Oracle hands-free (wake word + STT + TTS)
+python -m oracle --voice --difficulty professional
+
 # Preview radio FX (standalone tuning tool)
 python tools/radio_preview.py
 ```
 
 ### Voice Testing Notes
 
-- Voice unit tests mock Kokoro and sounddevice — they run without audio deps
+- Voice unit tests mock Kokoro, RealtimeSTT, and sounddevice — they run without audio deps
 - Tests marked `@pytest.mark.integration` need real Kokoro model files
 - All tests should pass with `pytest tests/ -v` (no voice deps needed)
 - Audio invariant: all audio is float32, clipped to [-1.0, 1.0] before playback
-- Sprint 3c note: when adding InputStream (STT), switch `sd.play()` to `blocking=True`
+- `sd.play()` is non-blocking to allow wake word barge-in to interrupt TTS playback
 
 ## Architecture — Deterministic Pipeline
 
@@ -82,8 +88,9 @@ user_text → parser.py (regex + fuzzy matching, instant)
 - `oracle/config/evidence_synonyms.yaml` — Maps spoken/typed evidence strings to canonical IDs.
 - `oracle/config/ghost_tests.yaml` — Deterministic ghost tests (pass/fail).
 - `oracle/voice/tts.py` — TTSProvider protocol + Kokoro-onnx wrapper. Swappable TTS backend.
+- `oracle/voice/stt.py` — STTProvider protocol + VoiceInput class. RealtimeSTT wrapper with wake word detection and barge-in support.
 - `oracle/voice/radio_fx.py` — CB radio FX chain (band-pass, saturation, limiter, noise, assets). Composable stages.
-- `oracle/voice/audio_config.py` — Audio pipeline constants. Each FX stage independently toggleable.
+- `oracle/voice/audio_config.py` — Audio pipeline constants, STT config, VB-Cable device discovery. Each FX stage independently toggleable.
 
 ## Key Design Decisions
 
@@ -104,4 +111,5 @@ user_text → parser.py (regex + fuzzy matching, instant)
 | `BENCHMARK_GUIDE.md` | Measuring Kokoro TTS latency on target hardware |
 | `docs/Ghost Identification Guide.md` | Game mechanics reference |
 | `docs/Sprint 3b - Voice Pipeline.md` | Voice output sprint spec (complete) |
+| `docs/test-audit/` | Hawk + Viper test audit reports from Sprint 3c |
 | `archive/langgraph-v1/` | Reference for the old LangGraph implementation |

@@ -70,6 +70,8 @@ RULE_OUT_PATTERNS: list[re.Pattern] = [
 INIT_PATTERNS: list[re.Pattern] = [
     re.compile(r"\b(?:new|start|begin|fresh|reset)\b.*\b(?:investigation|game|match|round)\b", re.IGNORECASE),
     re.compile(r"\b(?:investigation|game|match)\b.*\b(?:new|start|begin|fresh)\b", re.IGNORECASE),
+    # STT often drops "new" — "game on nightmare" should still start a game
+    re.compile(r"\bgame\s+on\s+(?:amateur|intermediate|professional|nightmare|insanity)\b", re.IGNORECASE),
 ]
 
 STATE_PATTERNS: list[re.Pattern] = [
@@ -139,25 +141,55 @@ GHOST_TEST_RESULT_PATTERNS: list[re.Pattern] = [
 # ── STT fuzzy matching ──────────────────────────────────────────────────────
 
 STT_CORRECTIONS: dict[str, str] = {
+    # ── Evidence mishearings ──────────────────────────────────────────
     "herbs": "orbs",
     "herb": "orb",
     "orbz": "orbs",
-    "gorse": "goryo",
-    "banshi": "banshee",
-    "demon": "demon",
-    "revenent": "revenant",
-    "polterguist": "poltergeist",
-    "mares": "mare",
-    "ray": "wraith",
-    "yurei": "yurei",
-    "oni": "oni",
-    "phantasm": "phantom",
     "spirit bucks": "spirit box",
     "spiritbox": "spirit box",
     "you v": "uv",
     "u v": "uv",
     "ee em eff": "emf",
     "dots projector": "dots",
+    # ── Ghost name mishearings ────────────────────────────────────────
+    # Whisper often normalizes exotic names to common English words
+    "djinn": "jinn",
+    "gin": "jinn",
+    "jin": "jinn",
+    "genie": "jinn",
+    "gorse": "goryo",
+    "gorio": "goryo",
+    "gurio": "goryo",
+    "banshi": "banshee",
+    "bonshee": "banshee",
+    "revenent": "revenant",
+    "revenant's": "revenant",
+    "polterguist": "poltergeist",
+    "polter geist": "poltergeist",
+    "mares": "mare",
+    "phantasm": "phantom",
+    "ray": "wraith",
+    "wraithe": "wraith",
+    "obaki": "obake",
+    "rajew": "raiju",
+    "raichu": "raiju",
+    "ryju": "raiju",
+    "moroy": "moroi",
+    "moroy": "moroi",
+    "myling's": "myling",
+    "miling": "myling",
+    "deogan": "deogen",
+    "deegan": "deogen",
+    "dayan's": "dayan",
+    "dianne": "dayan",
+    "diane": "dayan",
+    "galu": "gallu",
+    "gallow": "gallu",
+    "obamble": "obambo",
+    "yokai's": "yokai",
+    "hantu's": "hantu",
+    "honto": "hantu",
+    "thay": "thaye",
 }
 
 
@@ -299,11 +331,18 @@ def _is_rule_out(text: str) -> bool:
 
 
 def _find_ghost_name(text: str) -> str | None:
-    """Check if a known ghost name appears in the text."""
+    """Check if a known ghost name appears in the text as a whole word.
+
+    Uses word boundary matching to prevent substring collisions like
+    "mare" matching inside "nightmare" or "oni" inside "anyone".
+    Multi-word names like "The Mimic" and "The Twins" are matched as phrases.
+    """
     from .deduction import all_ghost_names
-    text_lower = text.lower()
-    for name in all_ghost_names():
-        if name.lower() in text_lower:
+    # Try longest names first so "The Mimic" matches before "Mimic" alone
+    names = sorted(all_ghost_names(), key=len, reverse=True)
+    for name in names:
+        pattern = r"\b" + re.escape(name) + r"\b"
+        if re.search(pattern, text, re.IGNORECASE):
             return name
     return None
 

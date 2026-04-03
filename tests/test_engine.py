@@ -147,10 +147,9 @@ class TestRecordEvidence:
         engine.record_evidence("dots", "confirmed")
         engine.record_evidence("emf_5", "confirmed")
         result = engine.record_evidence("uv", "confirmed")
-        # If exactly 1 candidate remains + threshold reached, should trigger
-        if result.remaining_count == 1:
-            assert result.identification_triggered is True
-            assert result.identified_ghost is not None
+        assert result.remaining_count == 1
+        assert result.identification_triggered is True
+        assert result.identified_ghost is not None
 
     def test_mimic_not_detected_below_threshold(self, engine):
         """Confirming orb below evidence threshold should NOT trigger mimic_detected.
@@ -179,6 +178,7 @@ class TestRecordEvidence:
         # 4th evidence is orb — exceeds threshold, triggers Mimic detection
         result = engine.record_evidence("orb", "confirmed")
         # With all 4 Mimic evidence, it narrows to Mimic alone
+        assert result.mimic_detected is True
         assert result.remaining_count == 1
         assert result.candidates == ["The Mimic"]
         assert result.identification_triggered is True
@@ -219,15 +219,18 @@ class TestRecordEvidence:
         assert result.zero_candidates is True
         assert result.remaining_count == 0
 
-    def test_phase_shifted_flag(self, engine):
+    def test_phase_shifted_flag(self):
         """Threshold reached + multiple candidates triggers phase_shifted."""
-        engine.record_evidence("emf_5", "confirmed")
-        engine.record_evidence("dots", "confirmed")
-        result = engine.record_evidence("uv", "confirmed")
-        # If multiple candidates remain, phase should shift
-        if result.remaining_count > 1 and result.threshold_reached:
-            assert result.phase_shifted is True
-            assert engine.investigation_phase == "behavioral"
+        # Use nightmare (threshold=2). Confirming [emf_5, uv] matches multiple
+        # ghosts (Goryo, Myling, Obake, Jinn, Gallu) so remaining_count > 1.
+        eng = InvestigationEngine()
+        eng.new_game("nightmare")
+        eng.record_evidence("emf_5", "confirmed")
+        result = eng.record_evidence("uv", "confirmed")
+        assert result.remaining_count > 1
+        assert result.threshold_reached is True
+        assert result.phase_shifted is True
+        assert eng.investigation_phase == "behavioral"
 
 
 # ---------------------------------------------------------------------------
@@ -415,20 +418,19 @@ class TestEndGame:
 class TestGhostTestLookup:
     def test_ghost_with_test(self, engine):
         """A ghost that has a test entry returns has_test=True."""
-        # Try Goryo — commonly has a test
         result = engine.ghost_test_lookup("Goryo")
         assert isinstance(result, TestLookupResult)
         assert result.found is True
-        # If the YAML has a test for Goryo:
-        if result.has_test:
-            assert result.test_description is not None
+        assert result.has_test is True
+        assert result.test_description is not None
 
     def test_ghost_without_test(self, engine):
         """A ghost in the DB but without a test entry returns has_test=False."""
-        result = engine.ghost_test_lookup("Spirit")
+        # The Mimic is the only ghost without a behavioral test (26/27 covered).
+        # Its identifier is the 4th evidence (fake Ghost Orbs), not a test.
+        result = engine.ghost_test_lookup("The Mimic")
         assert result.found is True
-        # Spirit may or may not have a test — just verify the structure
-        assert isinstance(result.has_test, bool)
+        assert result.has_test is False
 
     def test_unknown_ghost(self, engine):
         result = engine.ghost_test_lookup("Casper")

@@ -193,7 +193,7 @@ def _build_ghost_query_response(result: GhostQueryResult) -> str:
 
     # Evidence status in current investigation
     if result.evidence_status:
-        confirmed = [ev for ev, st in result.evidence_status.items() if st == "CONFIRMED"]
+        confirmed = [ev for ev, st in result.evidence_status.items() if st == "confirmed"]
         untested = [ev for ev, st in result.evidence_status.items() if st == "untested"]
         if confirmed:
             parts.append(f"We've already confirmed {_evidence_list(confirmed)}.")
@@ -371,7 +371,7 @@ def _build_unknown_command_response(result: UnknownCommandResult) -> str:
 
 def _build_player_registration_response(result: PlayerRegistrationResult) -> str:
     return (
-        f"Registered: {_ghost_list(result.names)}. "
+        f"Registered: {_ghost_list(result.added)}. "
         f"{result.total} players total."
     )
 

@@ -59,6 +59,20 @@ def _load_voice() -> str:
     return voice
 
 
+def _load_stt_input_device() -> str | None:
+    """Load STT_INPUT_DEVICE from .env.local."""
+    _load_env()
+    device = os.getenv("STT_INPUT_DEVICE")
+    return device if device else None
+
+
+def _load_vb_cable_device() -> str | None:
+    """Load VB_CABLE_DEVICE from .env.local."""
+    _load_env()
+    device = os.getenv("VB_CABLE_DEVICE")
+    return device if device else None
+
+
 @dataclass
 class AudioConfig:
     """Audio pipeline constants.
@@ -107,6 +121,13 @@ class AudioConfig:
     # ── Short-sentence padding ────────────────────────────────────────
     min_audio_duration_ms: float = 200.0  # Minimum TTS output before padding
 
+    # ── STT / Voice Input (Sprint 3c) ────────────────────────────────
+    whisper_model: str = "base"  # Whisper model size: tiny, base, small
+    wake_word: str = "hey_jarvis"  # openWakeWord model name
+    vad_aggressiveness: int = 2  # WebRTC VAD aggressiveness (0-3, higher = more aggressive)
+    stt_input_device: str | None = field(default_factory=_load_stt_input_device)
+    vb_cable_device: str | None = field(default_factory=_load_vb_cable_device)
+
 
 def get_config() -> AudioConfig:
     """Return default audio config.
@@ -114,3 +135,39 @@ def get_config() -> AudioConfig:
     Future: load overrides from .env.local or CLI flags.
     """
     return AudioConfig()
+
+
+# Known VB-Audio device name patterns (output devices that Oracle sends TTS to)
+_VB_CABLE_PATTERNS = [
+    "CABLE Input",
+    "CABLE-A",
+    "CABLE-B",
+    "VoiceMeeter Input",
+    "VoiceMeeter Aux Input",
+]
+
+
+def find_vb_cable_device() -> str | None:
+    """Scan sounddevice output devices for a VB-Audio virtual cable.
+
+    Searches for known VB-Cable device name patterns. Returns the first
+    match, or None if no VB-Cable device is found.
+
+    The returned name can be passed to sd.play(device=...) to route
+    Oracle's TTS audio through VB-Cable into Steam Voice Chat.
+    """
+    try:
+        import sounddevice as sd
+    except ImportError:
+        return None
+
+    devices = sd.query_devices()
+    for device in devices:
+        name = device["name"]
+        # Only check output devices (max_output_channels > 0)
+        if device["max_output_channels"] <= 0:
+            continue
+        for pattern in _VB_CABLE_PATTERNS:
+            if pattern.lower() in name.lower():
+                return name
+    return None

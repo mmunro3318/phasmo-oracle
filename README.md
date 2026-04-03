@@ -10,14 +10,19 @@ A voice-driven Phasmophobia ghost-identification assistant. Oracle narrows 27 gh
 git clone https://github.com/mmunro3318/phasmo-oracle.git
 cd phasmo-oracle
 python -m venv .venv
-.venv\Scripts\activate
+.venv/Scripts/activate
 pip install -e ".[dev,voice]"     # voice output with radio FX
 python -m oracle --text --speak --difficulty professional
+
+# OR: hands-free mode (wake word + STT + TTS)
+pip install -e ".[dev,voice-full]"
+python -m oracle --voice --difficulty professional
 ```
 
 Model files (~90MB) download automatically on first run.
 
 **Text only (no voice):**
+
 ```bash
 pip install -e ".[dev]"
 python -m oracle --text --difficulty professional
@@ -31,45 +36,45 @@ Oracle uses pattern matching — phrase commands naturally. Here's what works:
 
 ### Evidence
 
-| What you say | What happens |
-|-------------|-------------|
-| `confirm EMF 5` | Records EMF 5 as confirmed |
-| `we found ghost orbs` | Records Ghost Orb as confirmed |
-| `rule out spirit box` | Rules out Spirit Box |
-| `no freezing temps` | Rules out Freezing Temperatures |
-| `deny ghost writing` | Rules out Ghost Writing |
+| What you say          | What happens                    |
+| --------------------- | ------------------------------- |
+| `confirm EMF 5`       | Records EMF 5 as confirmed      |
+| `we found ghost orbs` | Records Ghost Orb as confirmed  |
+| `rule out spirit box` | Rules out Spirit Box            |
+| `no freezing temps`   | Rules out Freezing Temperatures |
+| `deny ghost writing`  | Rules out Ghost Writing         |
 
 **Tip:** You can say evidence names casually — "orbs", "freezing", "UV", "dots", "writing", "spirit box", "EMF" all work.
 
 ### Investigation
 
-| What you say | What happens |
-|-------------|-------------|
-| `what's left` / `status` | Shows remaining candidates |
-| `what should we check next` | Suggests the most useful evidence to test |
-| `what tests can we try` | Lists available tests for remaining ghosts |
+| What you say                | What happens                               |
+| --------------------------- | ------------------------------------------ |
+| `what's left` / `status`    | Shows remaining candidates                 |
+| `what should we check next` | Suggests the most useful evidence to test  |
+| `what tests can we try`     | Lists available tests for remaining ghosts |
 
 ### Ghost Info
 
-| What you say | What happens |
-|-------------|-------------|
-| `tell me about the Banshee` | Ghost card — evidence, behaviors, tests |
-| `what's the Goryo test` | Specific ghost test lookup |
+| What you say                   | What happens                             |
+| ------------------------------ | ---------------------------------------- |
+| `tell me about the Banshee`    | Ghost card — evidence, behaviors, tests  |
+| `what's the Goryo test`        | Specific ghost test lookup               |
 | `Goryo test passed` / `failed` | Records test result, may eliminate ghost |
 
 ### Guessing & Endgame
 
-| What you say | What happens |
-|-------------|-------------|
-| `I think it's a Deogen` | Records your theory |
-| `lock in Deogen` | Locks in your final answer |
+| What you say                | What happens                  |
+| --------------------------- | ----------------------------- |
+| `I think it's a Deogen`     | Records your theory           |
+| `lock in Deogen`            | Locks in your final answer    |
 | `game over it was a Wraith` | Ends the game, records result |
-| `new game nightmare` | Starts a fresh investigation |
+| `new game nightmare`        | Starts a fresh investigation  |
 
 ### Voice
 
-| What you say | What happens |
-|-------------|-------------|
+| What you say               | What happens            |
+| -------------------------- | ----------------------- |
 | `change voice to af_bella` | Switches Oracle's voice |
 
 Voice names are shown in "The Team" table at startup. Set a default in `.env.local` with `KOKORO_VOICE=bm_fable`.
@@ -81,7 +86,7 @@ Voice names are shown in "The Team" table at startup. Set a default in `.env.loc
 Oracle uses a fully deterministic pipeline — no LLM, no cloud APIs, everything runs locally:
 
 ```
-Your command → Regex Parser (instant) → Deduction Engine → Scripted Response → TTS + Radio FX → Speaker
+Your voice / keyboard → Regex Parser (instant) → Deduction Engine → Scripted Response → TTS + Radio FX → Speaker / VB-Cable
 ```
 
 1. **Parser** (`oracle/parser.py`) — regex pattern matching classifies your input into actions (confirm evidence, query ghost, start game, etc.)
@@ -130,18 +135,19 @@ python -m oracle --text --speak --difficulty professional
 ```
 
 If you get "execution of scripts is disabled":
+
 ```
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 ### Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| `python: command not found` | Reinstall Python with "Add to PATH" checked |
-| `ModuleNotFoundError` | Activate the venv: `.venv\Scripts\activate` |
-| `execution of scripts is disabled` | Run the `Set-ExecutionPolicy` command above |
-| No audio output | Check `.env.local` for `AUDIO_DEVICE` setting |
+| Problem                            | Fix                                           |
+| ---------------------------------- | --------------------------------------------- |
+| `python: command not found`        | Reinstall Python with "Add to PATH" checked   |
+| `ModuleNotFoundError`              | Activate the venv: `.venv\Scripts\activate`   |
+| `execution of scripts is disabled` | Run the `Set-ExecutionPolicy` command above   |
+| No audio output                    | Check `.env.local` for `AUDIO_DEVICE` setting |
 
 ---
 
@@ -155,6 +161,12 @@ KOKORO_VOICE=bm_fable
 
 # Audio output device (leave empty for system default)
 # AUDIO_DEVICE=
+
+# Voice input: physical mic index for STT (run pyaudio device list to find)
+# STT_INPUT_DEVICE=
+
+# VB-Cable device name for routing TTS to Steam Voice Chat
+# VB_CABLE_DEVICE=
 ```
 
 ---
@@ -187,13 +199,14 @@ phasmo-oracle/
 │   ├── state.py               # Type definitions (EvidenceID, Difficulty)
 │   ├── voice/
 │   │   ├── tts.py             # Kokoro TTS wrapper (swappable via TTSProvider)
+│   │   ├── stt.py             # RealtimeSTT wrapper — wake word + STT input
 │   │   ├── radio_fx.py        # CB radio FX chain (band-pass, saturation, noise)
-│   │   └── audio_config.py    # Audio pipeline constants + voice catalogue
+│   │   └── audio_config.py    # Audio + STT config, VB-Cable device discovery
 │   └── config/
 │       ├── ghost_database.yaml    # 27 ghosts — evidence, tells, eliminators
 │       ├── ghost_tests.yaml       # 26 deterministic ghost tests
 │       └── evidence_synonyms.yaml # Maps spoken evidence to canonical IDs
-├── tests/                     # ~500 tests (no audio deps needed)
+├── tests/                     # ~320 tests (no audio deps needed)
 ├── tools/
 │   └── radio_preview.py       # Standalone radio FX tuning tool
 ├── docs/                      # Sprint specs, ghost guides
@@ -206,10 +219,10 @@ phasmo-oracle/
 
 ## Docs
 
-| Document | Purpose |
-|----------|---------|
-| [CLAUDE.md](CLAUDE.md) | Project guide — architecture, invariants, build/test commands |
-| [INSIGHTS.md](INSIGHTS.md) | Lessons from the LangGraph→deterministic pivot |
-| [BENCHMARK_GUIDE.md](BENCHMARK_GUIDE.md) | How to measure TTS latency on your hardware |
-| [Ghost Identification Guide](docs/Ghost%20Identification%20Guide.md) | Phasmophobia game mechanics reference |
-| [Sprint 3b](docs/Sprint%203b%20-%20Voice%20Pipeline.md) | Voice output sprint spec (complete) |
+| Document                                                             | Purpose                                                       |
+| -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [CLAUDE.md](CLAUDE.md)                                               | Project guide — architecture, invariants, build/test commands |
+| [INSIGHTS.md](INSIGHTS.md)                                           | Lessons from the LangGraph→deterministic pivot                |
+| [BENCHMARK_GUIDE.md](BENCHMARK_GUIDE.md)                             | How to measure TTS latency on your hardware                   |
+| [Ghost Identification Guide](docs/Ghost%20Identification%20Guide.md) | Phasmophobia game mechanics reference                         |
+| [Sprint 3b](docs/Sprint%203b%20-%20Voice%20Pipeline.md)              | Voice output sprint spec (complete)                           |

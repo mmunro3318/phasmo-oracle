@@ -16,9 +16,14 @@ from oracle.voice.tts import KokoroTTS, TTSProvider
 class TestTTSProviderProtocol:
     def test_kokoro_satisfies_protocol(self):
         """KokoroTTS must satisfy the TTSProvider protocol."""
-        # We can't instantiate KokoroTTS without kokoro-onnx, but we can
-        # verify the class has the right method signature.
-        assert hasattr(KokoroTTS, "synthesize")
+        # Verify the class has the synthesize method with correct signature.
+        # Can't use isinstance() without instantiation (needs kokoro-onnx),
+        # but we can verify the method exists and is callable.
+        assert callable(getattr(KokoroTTS, "synthesize", None))
+        # Verify return type annotation matches protocol
+        import inspect
+        sig = inspect.signature(KokoroTTS.synthesize)
+        assert "text" in sig.parameters
 
     def test_custom_provider_satisfies_protocol(self):
         """A custom class with synthesize() should satisfy TTSProvider."""

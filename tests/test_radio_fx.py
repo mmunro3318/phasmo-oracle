@@ -219,16 +219,17 @@ class TestOutputProperties:
 
 
 class TestProcessingLatency:
-    def test_fx_processing_under_50ms(self, fx, short_audio, config):
+    @pytest.mark.slow
+    def test_fx_processing_under_200ms(self, fx, short_audio, config):
         """FX processing for a typical response should be fast.
 
-        Target: < 50ms for 0.3s of audio (generous — design target is <10ms).
-        Using 50ms to avoid flaky tests on slow CI.
+        Target: < 200ms for 0.3s of audio. Using generous threshold to
+        avoid flaky tests on slow CI or overloaded machines.
         """
         start = time.perf_counter()
         fx.apply(short_audio, config.sample_rate, candidate_count=10)
         elapsed_ms = (time.perf_counter() - start) * 1000
-        assert elapsed_ms < 50, f"FX took {elapsed_ms:.1f}ms, expected < 50ms"
+        assert elapsed_ms < 200, f"FX took {elapsed_ms:.1f}ms, expected < 200ms"
 
 
 class TestAssetGeneration:

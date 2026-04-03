@@ -181,22 +181,90 @@ class TestDeviceResampling:
 class TestCLIFlags:
     def test_text_only_no_speak(self):
         """--text without --speak should use RichOutput."""
-        from oracle.runner import main, RichOutput
+        from oracle.runner import main
         with patch("sys.argv", ["oracle", "--text"]):
             with patch("oracle.runner.run_loop") as mock_loop:
                 with patch("oracle.runner.RichOutput") as mock_rich:
                     main()
-                    # run_loop should be called with RichOutput
-                    call_args = mock_loop.call_args
-                    assert mock_rich.called
+                    mock_loop.assert_called_once()
+                    # Verify RichOutput instance was passed as the output handler
+                    output_arg = mock_loop.call_args[0][2]
+                    assert output_arg == mock_rich.return_value
 
-    def test_speak_without_text_exits(self):
-        """--speak without --text should exit with error."""
-        # argparse with store_true and default=True means --text is always True
-        # unless we directly test the validation logic
-        from oracle.runner import main
-        with patch("sys.argv", ["oracle", "--speak"]):
-            # --text defaults to True, so --speak alone actually works.
-            # The validation checks `not args.text` which is False since
-            # --text defaults to True. This is correct behavior.
-            pass
+
+
+class TestVBCableRouting:
+    """Tests for VB-Cable device routing in VoiceOutput."""
+
+    def test_output_device_overrides_config(self):
+        """When output_device is provided, it should override config audio_device."""
+        vo, engine, mock_tts, mock_radio, mock_sd = _make_voice_output()
+        vo._audio_device = "CABLE Input (VB-Audio Virtual Cable)"
+        vo.show_response("Test")
+        call_kwargs = mock_sd.play.call_args[1]
+        assert call_kwargs.get("device") == "CABLE Input (VB-Audio Virtual Cable)"
+
+    def test_no_output_device_uses_config(self):
+        """When no output_device, should use config audio_device (None = default)."""
+        vo, engine, mock_tts, mock_radio, mock_sd = _make_voice_output()
+        assert vo._audio_device is None  # Default from config
+        vo.show_response("Test")
+        call_kwargs = mock_sd.play.call_args[1]
+        # No device kwarg when audio_device is None
+        assert "device" not in call_kwargs
+
+    def test_vb_cable_device_name_passed_to_sd_play(self):
+        """sd.play should receive the VB-Cable device name."""
+        vo, engine, mock_tts, mock_radio, mock_sd = _make_voice_output()
+        vo._audio_device = "VoiceMeeter Input"
+        vo.show_response("Copy that")
+        call_kwargs = mock_sd.play.call_args[1]
+        assert call_kwargs["device"] == "VoiceMeeter Input"
+
+    def test_speak_mode_still_works_without_vb_cable(self):
+        """--text --speak (no --voice) should still work as before."""
+        vo, engine, mock_tts, mock_radio, mock_sd = _make_voice_output()
+        # audio_device is None (no VB-Cable)
+        vo.show_response("EMF confirmed")
+        mock_tts.synthesize.assert_called_once()
+        mock_radio.apply.assert_called_once()
+        mock_sd.play.assert_called_once()
+
+
+class TestSpeakingFlag:
+    """Tests for is_speaking flag wiring in run_loop."""
+
+    def test_run_loop_calls_show_response(self):
+        """run_loop should process commands and call show_response."""
+        from oracle.runner import run_loop
+        from oracle.engine import InvestigationEngine
+
+        engine = InvestigationEngine()
+        engine.new_game("professional")
+
+        # Track is_speaking assignments
+        speaking_values = []
+
+        class FakeInput:
+            def __init__(self):
+                self._calls = iter(["emf confirmed", None])
+                self._is_speaking = False
+
+            @property
+            def is_speaking(self):
+                return self._is_speaking
+
+            @is_speaking.setter
+            def is_speaking(self, value):
+                speaking_values.append(value)
+                self._is_speaking = value
+
+            def get_command(self):
+                return next(self._calls)
+
+        mock_output = MagicMock()
+        run_loop(engine, FakeInput(), mock_output)
+
+        mock_output.show_response.assert_called()
+        # is_speaking should have been set True then False
+        assert speaking_values == [True, False]

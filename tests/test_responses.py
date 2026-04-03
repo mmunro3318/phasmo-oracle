@@ -21,8 +21,10 @@ from oracle.engine import (
     TestResult,
     UnknownCommandResult,
     PlayerRegistrationResult,
+    VoiceChangeResult,
+    AvailableTestsResult,
 )
-from oracle.responses import build_response, _MIN_LENGTH
+from oracle.responses import build_response, _MIN_LENGTH, _FILLER
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +77,7 @@ class TestEvidenceResponse:
     def test_confirmed_includes_confirmed(self):
         result = _evidence_result(status="confirmed")
         response = build_response(result)
-        assert "confirmed" in response.lower() or "in" in response.lower()
+        assert "confirmed" in response.lower() or "is in" in response.lower()
 
     def test_ruled_out_includes_ruled_out(self):
         result = _evidence_result(status="ruled_out")
@@ -290,10 +292,84 @@ class TestMinimumLength:
         """A response already above _MIN_LENGTH should not get filler appended."""
         result = NewGameResult(difficulty="professional", candidate_count=27)
         response = build_response(result)
-        # The new game response is long enough naturally
         assert len(response) >= _MIN_LENGTH
-        # If it's well above the minimum, filler should not be appended
-        # (filler text is "Say a command when you're ready.")
-        if len(response) > _MIN_LENGTH + 20:
-            # It's long enough that filler shouldn't be there
-            pass  # We just check it's valid
+        assert _FILLER not in response
+
+
+# ---------------------------------------------------------------------------
+# PlayerRegistrationResult (regression: was using result.names instead of result.added)
+# ---------------------------------------------------------------------------
+
+
+class TestPlayerRegistrationResponse:
+    def test_renders_added_players(self):
+        result = PlayerRegistrationResult(added=["Mike", "Kayden"], total=2)
+        response = build_response(result)
+        assert "Mike" in response
+        assert "Kayden" in response
+        assert "2" in response
+
+    def test_single_player(self):
+        result = PlayerRegistrationResult(added=["Mike"], total=1)
+        response = build_response(result)
+        assert "Mike" in response
+
+    def test_three_players_uses_oxford_comma(self):
+        result = PlayerRegistrationResult(added=["Mike", "Kayden", "Alex"], total=3)
+        response = build_response(result)
+        assert "Mike" in response and "Kayden" in response and "Alex" in response
+
+
+# ---------------------------------------------------------------------------
+# GhostQueryResult confirmed evidence display
+# (regression: was checking "CONFIRMED" uppercase instead of "confirmed")
+# ---------------------------------------------------------------------------
+
+
+class TestGhostQueryConfirmedEvidence:
+    def test_confirmed_evidence_shown(self):
+        result = GhostQueryResult(
+            ghost_name="Wraith",
+            found=True,
+            evidence_list=["dots", "emf_5", "spirit_box"],
+            evidence_status={"dots": "confirmed", "emf_5": "untested", "spirit_box": "untested"},
+            guaranteed_evidence=None,
+            tells=[],
+            community_tests=[],
+            fake_evidence=None,
+            all_ghost_names=["Wraith"],
+        )
+        response = build_response(result)
+        assert "confirmed" in response.lower()
+        assert "dots" in response
+
+    def test_untested_evidence_shown(self):
+        result = GhostQueryResult(
+            ghost_name="Spirit",
+            found=True,
+            evidence_list=["emf_5", "spirit_box", "writing"],
+            evidence_status={"emf_5": "untested", "spirit_box": "untested", "writing": "untested"},
+            guaranteed_evidence=None,
+            tells=[],
+            community_tests=[],
+            fake_evidence=None,
+            all_ghost_names=["Spirit"],
+        )
+        response = build_response(result)
+        assert "check" in response.lower() or "untested" in response.lower()
+
+    def test_mixed_status_shows_both(self):
+        result = GhostQueryResult(
+            ghost_name="Demon",
+            found=True,
+            evidence_list=["freezing", "writing", "uv"],
+            evidence_status={"freezing": "confirmed", "writing": "confirmed", "uv": "untested"},
+            guaranteed_evidence=None,
+            tells=[],
+            community_tests=[],
+            fake_evidence=None,
+            all_ghost_names=["Demon"],
+        )
+        response = build_response(result)
+        assert "confirmed" in response.lower()
+        assert "uv" in response

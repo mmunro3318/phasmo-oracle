@@ -167,7 +167,7 @@ class VoiceOutput:
     show_state() and show_welcome() delegate directly to text display.
     """
 
-    def __init__(self, engine: InvestigationEngine):
+    def __init__(self, engine: InvestigationEngine, output_device: str | None = None):
         self._text = RichOutput()
         self._engine = engine
         self._sd = None  # Lazy import of sounddevice
@@ -181,6 +181,9 @@ class VoiceOutput:
 
         self._config = get_config()
         self._audio_device = self._config.audio_device
+        # Override with explicit output device (e.g. VB-Cable) if provided
+        if output_device is not None:
+            self._audio_device = output_device
         self._tts = KokoroTTS()
         self._radio = RadioFX()
         self._resample = resample_for_device
@@ -214,8 +217,7 @@ class VoiceOutput:
 
                 # Stop any currently playing audio to prevent overlap
                 self._sd.stop()
-                # Non-blocking: safe in Sprint 3b (no InputStream).
-                # Sprint 3c: switch to blocking=True when InputStream is added.
+                # Non-blocking: allows wake word barge-in to interrupt playback.
                 device_kwargs = {"device": self._audio_device} if self._audio_device else {}
                 self._sd.play(processed, sr, **device_kwargs)
             except Exception as e:
@@ -339,7 +341,15 @@ def run_loop(
                 output._tts.set_voice(result.voice_name)
 
         response = build_response(result)
+
+        # Set speaking flag for barge-in awareness
+        if hasattr(input_provider, 'is_speaking'):
+            input_provider.is_speaking = True
+
         output.show_response(response)
+
+        if hasattr(input_provider, 'is_speaking'):
+            input_provider.is_speaking = False
 
         # Show state panel after evidence changes
         if isinstance(result, (EvidenceResult, BehavioralResult, NewGameResult)):
@@ -360,6 +370,10 @@ def main() -> None:
         help="Enable voice output with CB radio FX (requires --text, voice deps)",
     )
     parser.add_argument(
+        "--voice", action="store_true", default=False,
+        help="Enable voice input (wake word + STT) and voice output (implies --speak)",
+    )
+    parser.add_argument(
         "--difficulty",
         choices=["amateur", "intermediate", "professional", "nightmare", "insanity"],
         default=None,
@@ -367,11 +381,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # --speak without --text is invalid (STT not available until Sprint 3c)
-    if args.speak and not args.text:
+    # --voice implies --speak
+    if args.voice:
+        args.speak = True
+
+    # --speak without --text is invalid (unless --voice provides STT input)
+    if args.speak and not args.text and not args.voice:
         print(
-            "Error: --speak requires --text (voice input not available until Sprint 3c).\n"
-            "Usage: oracle --text --speak",
+            "Error: --speak requires --text or --voice.\n"
+            "Usage: oracle --text --speak  OR  oracle --voice",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -382,12 +400,69 @@ def main() -> None:
         result = engine.new_game(args.difficulty)
         print(f"Auto-started: {result.difficulty} difficulty, {result.candidate_count} ghosts.")
 
-    input_provider = TextInput()
+    # ── Input provider ───────────────────────────────────────────────
+    voice_input = None
+    if args.voice:
+        try:
+            from oracle.voice.stt import VoiceInput
+            from oracle.voice.audio_config import get_config
 
+            config = get_config()
+
+            # Parse device index (must be integer for PyAudio)
+            device_index = None
+            if config.stt_input_device:
+                try:
+                    device_index = int(config.stt_input_device)
+                except ValueError:
+                    print(
+                        f"Error: STT_INPUT_DEVICE must be an integer device index, "
+                        f"got '{config.stt_input_device}'.\n"
+                        "Run: python -c \"import pyaudio; p=pyaudio.PyAudio(); "
+                        "[print(i, p.get_device_info_by_index(i)['name']) "
+                        "for i in range(p.get_device_count())]\"",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+
+            voice_input = VoiceInput(
+                whisper_model=config.whisper_model,
+                wake_word=config.wake_word,
+                input_device_index=device_index,
+                vad_aggressiveness=config.vad_aggressiveness,
+            )
+            input_provider: InputProvider = voice_input
+            print("Voice input enabled — say the wake word to activate.")
+        except ImportError as e:
+            print(
+                f"Voice input dependencies not installed: {e}\n"
+                "Install with: pip install -e '.[voice-full]'",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        except Exception as e:
+            print(f"Voice input initialization failed: {e}", file=sys.stderr)
+            print("Falling back to keyboard input.")
+            input_provider = TextInput()
+    else:
+        input_provider = TextInput()
+
+    # ── Output handler ───────────────────────────────────────────────
     if args.speak:
         try:
-            output: OutputHandler = VoiceOutput(engine)
-            print("Voice output enabled — Oracle will speak through your speakers.")
+            from oracle.voice.audio_config import find_vb_cable_device
+
+            output_device = None
+            if args.voice:
+                output_device = find_vb_cable_device()
+                if output_device:
+                    print(f"VB-Cable found: routing TTS to '{output_device}' for Steam.")
+                else:
+                    print("VB-Cable not found — using default speakers.")
+
+            output: OutputHandler = VoiceOutput(engine, output_device=output_device)
+            if not output_device:
+                print("Voice output enabled — Oracle will speak through your speakers.")
         except ImportError as e:
             print(
                 f"Voice dependencies not installed: {e}\n"
@@ -402,7 +477,15 @@ def main() -> None:
     else:
         output = RichOutput()
 
+    # ── Pre-warm announcement ────────────────────────────────────────
+    if args.voice and voice_input and not voice_input.failed:
+        output.show_response("Oracle online.")
+
     run_loop(engine, input_provider, output)
+
+    # Clean up voice input
+    if voice_input is not None:
+        voice_input.shutdown()
 
 
 if __name__ == "__main__":
