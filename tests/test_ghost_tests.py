@@ -71,42 +71,38 @@ class TestPositiveTests:
 class TestNegativeTests:
     """Negative tests: passed=True means the ghost DID exhibit disqualifying behavior.
 
-    NOTE: ghost_test_result() currently looks up YAML keys by title-case name
-    (e.g. "Wraith") but ghost_tests.yaml uses lowercase keys ("wraith").
-    This means test_type defaults to "positive" for ALL ghosts. The tests
-    below verify the ACTUAL current behavior. If the YAML lookup is fixed
-    to be case-insensitive (like ghost_test_lookup does), these tests
-    should be updated to reflect correct negative-test semantics.
+    For negative test_type ghosts (e.g. Banshee, Goryo, Wraith):
+    - passed=True means the ghost exhibited the behavior -> ELIMINATE (it's not that ghost)
+    - passed=False means the ghost did NOT exhibit the behavior -> IDENTIFY (consistent)
     """
 
-    def test_wraith_passed_identifies_as_positive(self, engine):
-        """Due to case mismatch, Wraith is treated as positive test.
-        passed=True on a 'positive' test -> identifies the ghost."""
-        result = engine.ghost_test_result("Wraith", passed=True)
+    def test_negative_passed_eliminates_ghost(self, engine):
+        """Banshee has test_type=negative. passed=True means the ghost targeted
+        multiple players (disqualifying behavior) -> eliminate."""
+        result = engine.ghost_test_result("Banshee", passed=True)
         assert isinstance(result, TestResult)
-        # Treated as positive test: passed=True -> identify, not eliminate
-        assert result.identified_ghost == "Wraith"
-        assert result.eliminated_ghosts == []
-
-    def test_wraith_failed_eliminates_as_positive(self, engine):
-        """Due to case mismatch, Wraith is treated as positive test.
-        passed=False on a 'positive' test -> eliminates the ghost."""
-        result = engine.ghost_test_result("Wraith", passed=False)
-        assert isinstance(result, TestResult)
-        assert "Wraith" in result.eliminated_ghosts
+        assert "Banshee" in result.eliminated_ghosts
         assert result.identified_ghost is None
 
-    def test_banshee_passed_identifies_as_positive(self, engine):
-        """Banshee also treated as positive due to case mismatch."""
-        result = engine.ghost_test_result("Banshee", passed=True)
+    def test_negative_failed_identifies_ghost(self, engine):
+        """Banshee has test_type=negative. passed=False means the ghost did NOT
+        exhibit disqualifying behavior -> identifies as Banshee."""
+        result = engine.ghost_test_result("Banshee", passed=False)
+        assert isinstance(result, TestResult)
         assert result.identified_ghost == "Banshee"
         assert result.eliminated_ghosts == []
 
-    def test_oni_failed_eliminates_as_positive(self, engine):
-        """Oni also treated as positive due to case mismatch."""
-        result = engine.ghost_test_result("Oni", passed=False)
-        assert "Oni" in result.eliminated_ghosts
+    def test_goryo_negative_passed_eliminates(self, engine):
+        """Goryo has test_type=negative. passed=True (ghost changed rooms) -> eliminate."""
+        result = engine.ghost_test_result("Goryo", passed=True)
+        assert "Goryo" in result.eliminated_ghosts
         assert result.identified_ghost is None
+
+    def test_goryo_negative_failed_identifies(self, engine):
+        """Goryo has test_type=negative. passed=False (ghost didn't change rooms) -> identify."""
+        result = engine.ghost_test_result("Goryo", passed=False)
+        assert result.identified_ghost == "Goryo"
+        assert result.eliminated_ghosts == []
 
 
 # ---------------------------------------------------------------------------
@@ -174,11 +170,12 @@ class TestAvailableTests:
 
     def test_eliminated_ghost_not_in_results(self, engine):
         """After eliminating a ghost, it should not appear in available_tests."""
-        engine.ghost_test_result("Wraith", passed=False)  # Eliminate Wraith
+        # Hantu has test_type=positive; passed=False eliminates it
+        engine.ghost_test_result("Hantu", passed=False)
         result = engine.available_tests()
         testable_names = [name for name, _ in result.testable]
-        assert "Wraith" not in testable_names
-        assert "Wraith" not in result.untestable
+        assert "Hantu" not in testable_names
+        assert "Hantu" not in result.untestable
         assert result.total_candidates == 26
 
     def test_testable_descriptions_are_nonempty(self, engine):

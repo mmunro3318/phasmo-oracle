@@ -276,6 +276,12 @@ TEST_QUERY_PATTERNS: list[re.Pattern] = [
     re.compile(r"\b(\w+)\s+test\s*\?", re.IGNORECASE),
 ]
 
+# ── Quit / shutdown patterns ────────────────────────────────────────────────
+
+QUIT_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\bshut\s*(?:it\s+)?down\b", re.IGNORECASE),
+]
+
 # ── Theory patterns ──────────────────────────────────────────────────────
 
 THEORY_PATTERNS: list[re.Pattern] = [
@@ -358,6 +364,11 @@ def parse_intent(text: str) -> ParsedIntent:
 
     # Apply STT corrections before parsing
     text = _apply_stt_corrections(text)
+
+    # 0. Quit / shutdown — checked first so "shut down" isn't misrouted
+    for pattern in QUIT_PATTERNS:
+        if pattern.search(text):
+            return ParsedIntent(action="quit", raw_text=text)
 
     # 1. New investigation?
     for pattern in INIT_PATTERNS:

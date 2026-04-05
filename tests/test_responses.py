@@ -373,3 +373,119 @@ class TestGhostQueryConfirmedEvidence:
         response = build_response(result)
         assert "confirmed" in response.lower()
         assert "uv" in response
+
+
+# ---------------------------------------------------------------------------
+# TestResult response builder
+# ---------------------------------------------------------------------------
+
+
+class TestTestResultResponse:
+    def test_identified_ghost(self):
+        result = TestResult(
+            ghost_name="Hantu",
+            passed=True,
+            eliminated_ghosts=[],
+            remaining_count=1,
+            identified_ghost="Hantu",
+        )
+        response = build_response(result)
+        assert "Hantu" in response
+        assert "confirmed" in response.lower() or "lock" in response.lower()
+
+    def test_passed_with_elimination(self):
+        result = TestResult(
+            ghost_name="Banshee",
+            passed=True,
+            eliminated_ghosts=["Banshee"],
+            remaining_count=26,
+        )
+        response = build_response(result)
+        assert "passed" in response.lower()
+        assert "Banshee" in response
+        assert "26" in response
+
+    def test_failed_with_elimination(self):
+        result = TestResult(
+            ghost_name="Hantu",
+            passed=False,
+            eliminated_ghosts=["Hantu"],
+            remaining_count=26,
+        )
+        response = build_response(result)
+        assert "failed" in response.lower()
+        assert "Hantu" in response
+
+    def test_passed_no_elimination(self):
+        result = TestResult(
+            ghost_name="Hantu",
+            passed=True,
+            eliminated_ghosts=[],
+            remaining_count=27,
+        )
+        response = build_response(result)
+        assert "passed" in response.lower()
+        assert "27" in response
+
+    def test_failed_no_elimination(self):
+        result = TestResult(
+            ghost_name="Hantu",
+            passed=False,
+            eliminated_ghosts=[],
+            remaining_count=27,
+        )
+        response = build_response(result)
+        assert "failed" in response.lower()
+
+
+# ---------------------------------------------------------------------------
+# VoiceChangeResult response builder
+# ---------------------------------------------------------------------------
+
+
+class TestVoiceChangeResponse:
+    def test_successful_voice_change(self):
+        result = VoiceChangeResult(
+            voice_name="bm_fable",
+            success=True,
+        )
+        response = build_response(result)
+        assert "Fable" in response
+        assert "taking over" in response.lower() or "ready" in response.lower()
+
+    def test_unknown_voice(self):
+        result = VoiceChangeResult(
+            voice_name="xx_unknown",
+            success=False,
+            available_voices=["af_sarah", "bm_fable", "bf_bella"],
+        )
+        response = build_response(result)
+        assert "unknown" in response.lower() or "Unknown" in response
+        assert "af_sarah" in response
+
+
+# ---------------------------------------------------------------------------
+# AvailableTestsResult response builder
+# ---------------------------------------------------------------------------
+
+
+class TestAvailableTestsResponse:
+    def test_with_testable_ghosts(self):
+        result = AvailableTestsResult(
+            testable=[("Goryo", "Check D.O.T.S. on camera only"), ("Hantu", "Watch for freezing breath")],
+            untestable=["The Mimic"],
+            total_candidates=3,
+        )
+        response = build_response(result)
+        assert "2 of 3" in response
+        assert "Goryo" in response
+        assert "Mimic" in response
+
+    def test_no_testable_ghosts(self):
+        result = AvailableTestsResult(
+            testable=[],
+            untestable=["Ghost A", "Ghost B"],
+            total_candidates=2,
+        )
+        response = build_response(result)
+        assert "none" in response.lower()

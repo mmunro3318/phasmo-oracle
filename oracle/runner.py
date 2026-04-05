@@ -333,6 +333,8 @@ def run_loop(
             break
 
         intent = parse_intent(text)
+        if intent.action == "quit":
+            break
         result = _dispatch(engine, intent)
 
         # Handle voice change — apply to VoiceOutput's TTS if available

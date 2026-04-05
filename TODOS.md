@@ -152,5 +152,29 @@ Sprint 3c delivered voice I/O. Sprint 3d hardens it for real gameplay:
 
 ---
 
+## Ghost name canonicalization — I/O boundary normalization
+**Priority:** P2 | **Effort:** M (CC: ~30 min) | **Sprint:** Post-3d
+
+Ghost names are title-case in some contexts ("Wraith") and lowercase in others ("wraith"). The codebase handles this ad-hoc with `.lower()` fallbacks in `ghost_test_result()`, `ghost_test_lookup()`, and other methods. This works but the pattern will recur each time a new method touches ghost names.
+
+**Solution:** Normalize ghost names to a canonical form (title-case) at system entry points: parser output, YAML loading, and engine method parameters. Then internal code never needs fallback lookups.
+
+**Depends on:** Sprint 3d's ghost_test_result bug fix (which adds another `.lower()` fallback). This TODO replaces the scattered fallbacks with a single normalization layer.
+
+**Found by:** Codex plan review during Sprint 3d eng review (2026-04-03). The case-mismatch bug at engine.py:765 is a symptom of missing canonicalization.
+
+---
+
+## Voice command index — "help" / "commands" listing
+**Priority:** P3 | **Effort:** S (CC: ~15 min) | **Sprint:** Post-3d
+
+Add a "help" or "commands" voice/text command that lists all available commands Oracle understands. This is ~20 lines: iterate the parser's pattern categories and print human-readable descriptions. Benefits: makes Oracle discoverable for new users (Kayden), serves as living documentation, and is a lighter alternative to a grammar rewrite.
+
+**Where to start:** Add a `COMMAND_INDEX` dict mapping category names to descriptions in parser.py. Add a "help"/"commands" parser pattern that returns a new `HelpResult`. Build a response in responses.py that formats the index.
+
+**Found by:** /plan-eng-review (2026-04-03). Lighter alternative to Codex's suggestion to replace the regex parser with a deterministic grammar (pyparsing/Lark), which is ocean-scale.
+
+---
+
 *Pre-pivot TODOs archived to `archive/TODOS-pre-pivot.md`*
 *Kokoro short-sentence padding: RESOLVED in `oracle/voice/tts.py` (200ms audio-level gate)*

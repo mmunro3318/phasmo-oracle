@@ -762,7 +762,8 @@ class InvestigationEngine:
 
         # Look up test type to determine elimination logic
         tests = _load_ghost_tests()
-        test_entry = tests.get(true_name, {})
+        # YAML keys are lowercase; ghost DB names are title case
+        test_entry = tests.get(true_name) or tests.get(true_name.lower()) or {}
         test_type = test_entry.get("test_type", "positive")
 
         should_eliminate = False
